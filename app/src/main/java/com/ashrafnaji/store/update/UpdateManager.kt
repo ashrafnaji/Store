@@ -69,6 +69,31 @@ object UpdateManager {
         mainHandler.post { listener.onError(message) }
     }
 
+    /** Fetches the repo's short description (shown as the store listing's blurb). */
+    fun fetchRepoDescription(onResult: (String?) -> Unit) {
+        Thread {
+            val description = try {
+                val url = URL("https://api.github.com/repos/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPO}")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.setRequestProperty("Accept", "application/vnd.github+json")
+                conn.connectTimeout = 15_000
+                conn.readTimeout = 15_000
+                try {
+                    if (conn.responseCode != HttpURLConnection.HTTP_OK) null
+                    else {
+                        val body = conn.inputStream.bufferedReader().use { it.readText() }
+                        JSONObject(body).optString("description").ifBlank { null }
+                    }
+                } finally {
+                    conn.disconnect()
+                }
+            } catch (e: Exception) {
+                null
+            }
+            mainHandler.post { onResult(description) }
+        }.start()
+    }
+
     /** Returns (versionName, downloadUrlForThisAbi?) or null if the request failed. */
     private fun fetchLatestRelease(): Pair<String, String?>? {
         val url = URL("https://api.github.com/repos/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPO}/releases/latest")

@@ -22,8 +22,15 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.versionText.text = "Version ${BuildConfig.VERSION_NAME}"
+        binding.appNameText.text = getString(R.string.app_name)
+        binding.appDeveloperText.text = "by ${BuildConfig.GITHUB_OWNER}"
+        binding.appDescriptionText.text = "Loading..."
+        binding.versionText.text = "Installed version ${BuildConfig.VERSION_NAME}"
         binding.checkUpdateButton.setOnClickListener { checkForUpdate() }
+
+        UpdateManager.fetchRepoDescription { description ->
+            binding.appDescriptionText.text = description ?: "No description available."
+        }
 
         requestNotificationPermissionIfNeeded()
         checkForUpdate()
@@ -39,6 +46,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkForUpdate() {
+        binding.checkUpdateButton.isEnabled = false
         binding.statusText.text = "Checking for updates..."
         UpdateManager.checkAndUpdate(this, object : UpdateManager.Listener {
             override fun onStatus(message: String) {
@@ -46,11 +54,15 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onUpToDate() {
-                binding.statusText.text = "You're on the latest version"
+                binding.statusText.text = "Up to date"
+                binding.checkUpdateButton.text = "Installed"
+                binding.checkUpdateButton.isEnabled = true
             }
 
             override fun onError(message: String) {
-                binding.statusText.text = "Update check failed: $message"
+                binding.statusText.text = "Couldn't check for updates: $message"
+                binding.checkUpdateButton.text = "Retry"
+                binding.checkUpdateButton.isEnabled = true
             }
         })
     }
