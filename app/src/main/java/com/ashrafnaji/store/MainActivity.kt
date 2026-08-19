@@ -24,10 +24,14 @@ class MainActivity : AppCompatActivity() {
     private val storagePermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { loadCatalog() }
 
+    private var hasLoadedOnce = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        binding.refreshButton.setOnClickListener { loadCatalog() }
 
         requestNotificationPermissionIfNeeded()
 
@@ -43,6 +47,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Installs are confirmed in a system dialog outside our process (and, for self-updates,
+        // this Activity gets killed and relaunched by the system). Re-check installed versions
+        // whenever the user comes back so cards don't stay stuck on "Installing...".
+        if (hasLoadedOnce) {
+            loadCatalog()
+        }
+    }
+
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -53,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadCatalog() {
+        hasLoadedOnce = true
         binding.appListContainer.removeAllViews()
         CatalogFetcher.fetch { items ->
             if (items == null) {

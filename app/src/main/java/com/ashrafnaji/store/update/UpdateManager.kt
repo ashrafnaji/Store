@@ -91,7 +91,8 @@ object UpdateManager {
                     if (conn.responseCode != HttpURLConnection.HTTP_OK) null
                     else {
                         val body = conn.inputStream.bufferedReader().use { it.readText() }
-                        JSONObject(body).optString("description").ifBlank { null }
+                        val json = JSONObject(body)
+                        if (json.isNull("description")) null else json.optString("description").ifBlank { null }
                     }
                 } finally {
                     conn.disconnect()
