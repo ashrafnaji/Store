@@ -1,0 +1,265 @@
+"""
+Admin panel (Tkinter, stdlib only) for publishing any app into the Store catalog.
+
+Pick per-architecture APK files (arm64-v8a / armeabi-v7a / x86 / x86_64 -- fill in only the
+ones you have), upload them as assets on a GitHub release, and add/update that app's entry
+in catalog.json so it shows up as a card in the Store app on customer devices.
+
+Run with:  python tools/admin_panel.py
+
+Reuses the same saved-token file as release_gui.py: %USERPROFILE%\\.store_releaser\\config.json.
+"""
+import base64
+import json
+import mimetypes
+import re
+import sys
+import threading
+import urllib.error
+import urllib.request
+from pathlib import Path
+from tkinter import (
+    BOTH, END, LEFT, RIGHT, X, Y, W, StringVar, BooleanVar,
+    Tk, Frame, Label, Entry, Button, Checkbutton, Text, Scrollbar, filedialog
+)
+
+REPO_OWNER = "ashrafnaji"
+REPO_NAME = "Store"
+ARCHS = ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]
+CONFIG_PATH = Path.home() / ".store_releaser" / "config.json"
+
+
+def load_saved_token():
+    try:
+        return json.loads(CONFIG_PATH.read_text()).get("token", "")
+    except Exception:
+        return ""
+
+
+def save_token(token: str):
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG_PATH.write_text(json.dumps({"token": token}))
+
+
+def slugify(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return slug or "app"
+
+
+def api_request(url, token, method="GET", data=None, content_type="application/json"):
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("Accept", "application/vnd.github+json")
+    if data is not None:
+        req.add_header("Content-Type", content_type)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read()
+            return json.loads(body.decode("utf-8")) if body else {}
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"GitHub API error {e.code} for {url}: {body}") from None
+
+
+def get_or_create_release(token, tag, name, log):
+    try:
+        release = api_request(f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/tags/{tag}", token)
+        log(f"Using existing release {tag}")
+        return release
+    except RuntimeError:
+        pass
+    payload = json.dumps({"tag_name": tag, "name": name, "generate_release_notes": False}).encode("utf-8")
+    release = api_request(
+        f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases",
+        token, method="POST", data=payload
+    )
+    log(f"Created release {tag}")
+    return release
+
+
+def delete_asset_if_present(token, release, asset_name, log):
+    for asset in release.get("assets", []):
+        if asset["name"] == asset_name:
+            log(f"Replacing existing asset {asset_name}...")
+            api_request(asset["url"], token, method="DELETE")
+            return
+
+
+def upload_asset(token, upload_url, file_path, asset_name, log):
+    mime = mimetypes.guess_type(asset_name)[0] or "application/vnd.android.package-archive"
+    data = Path(file_path).read_bytes()
+    log(f"Uploading {asset_name} ({len(data) / 1024:.0f} KB)...")
+    api_request(f"{upload_url}?name={asset_name}", token, method="POST", data=data, content_type=mime)
+    log(f"  done.")
+
+
+def fetch_catalog(token, log):
+    contents_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/catalog.json"
+    info = api_request(contents_url, token)
+    items = json.loads(base64.b64decode(info["content"]).decode("utf-8"))
+    return items, info["sha"]
+
+
+def push_catalog(token, items, sha, message, log):
+    content_b64 = base64.b64encode(json.dumps(items, indent=2).encode("utf-8")).decode("ascii")
+    contents_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/catalog.json"
+    payload = {"message": message, "content": content_b64, "branch": "main", "sha": sha}
+    api_request(contents_url, token, method="PUT", data=json.dumps(payload).encode("utf-8"))
+    log("catalog.json updated.")
+
+
+def publish_app(token, app_id, name, package_name, version, description, arch_files, log):
+    tag = f"{app_id}-v{version}"
+    release = get_or_create_release(token, tag, f"{name} v{version}", log)
+    upload_url = release["upload_url"].split("{")[0]
+
+    download_urls = {}
+    for arch, file_path in arch_files.items():
+        if not file_path:
+            continue
+        asset_name = f"{app_id}-{arch}.apk"
+        delete_asset_if_present(token, release, asset_name, log)
+        upload_asset(token, upload_url, file_path, asset_name, log)
+        download_urls[arch] = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/download/{tag}/{asset_name}"
+
+    if not download_urls:
+        raise RuntimeError("No APK files selected for any architecture.")
+
+    log("Updating catalog.json...")
+    items, sha = fetch_catalog(token, log)
+    items = [i for i in items if i.get("id") != app_id]
+    items.append({
+        "id": app_id,
+        "name": name,
+        "packageName": package_name,
+        "type": "static",
+        "version": version,
+        "downloadUrl": next(iter(download_urls.values())),
+        "downloadUrls": download_urls,
+        "description": description,
+    })
+    push_catalog(token, items, sha, f"Add/update {name} {version} in catalog", log)
+
+    log(f"\nPublished: {release['html_url']}")
+
+
+class AdminPanel:
+    def __init__(self, root: Tk):
+        self.root = root
+        root.title("Store - Admin Panel")
+        root.geometry("700x640")
+
+        form = Frame(root, padx=10, pady=10)
+        form.pack(fill=X)
+
+        self.name_var = StringVar()
+        self.package_var = StringVar()
+        self.version_var = StringVar()
+        self.id_var = StringVar()
+        self.token_var = StringVar(value=load_saved_token())
+        self.remember_var = BooleanVar(value=bool(load_saved_token()))
+        self.arch_vars = {arch: StringVar() for arch in ARCHS}
+
+        self._row(form, "App name:", self.name_var)
+        self._row(form, "Package name:", self.package_var, placeholder="com.example.app")
+        self._row(form, "Version (e.g. 1.0.0):", self.version_var)
+        self._row(form, "Catalog ID (optional):", self.id_var, placeholder="auto-generated from name")
+
+        Label(form, text="Description:", anchor="w").pack(fill=X, pady=(8, 0))
+        self.description_text = Text(form, height=3, wrap="word")
+        self.description_text.pack(fill=X)
+
+        Label(form, text="APK per architecture (leave blank to skip):", anchor="w").pack(fill=X, pady=(12, 4))
+        for arch in ARCHS:
+            self._arch_row(form, arch)
+
+        self._row(form, "GitHub token:", self.token_var, show="*")
+        Checkbutton(
+            form, text="Remember token on this PC", variable=self.remember_var
+        ).pack(anchor="w", pady=(0, 8))
+
+        self.action_button = Button(form, text="Publish to Store", command=self.start)
+        self.action_button.pack(anchor="w")
+
+        log_frame = Frame(root, padx=10, pady=10)
+        log_frame.pack(fill=BOTH, expand=True)
+        scrollbar = Scrollbar(log_frame)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        self.log_text = Text(log_frame, wrap="word", yscrollcommand=scrollbar.set)
+        self.log_text.pack(fill=BOTH, expand=True)
+        scrollbar.config(command=self.log_text.yview)
+
+    def _row(self, parent, label_text, var, show=None, placeholder=None):
+        row = Frame(parent)
+        row.pack(fill=X, pady=4)
+        Label(row, text=label_text, width=20, anchor="w").pack(side=LEFT)
+        entry = Entry(row, textvariable=var, show=show)
+        entry.pack(side=LEFT, fill=X, expand=True)
+        if placeholder:
+            Label(row, text=placeholder, fg="gray", anchor="w").pack(side=LEFT, padx=(6, 0))
+
+    def _arch_row(self, parent, arch):
+        row = Frame(parent)
+        row.pack(fill=X, pady=2)
+        Label(row, text=arch, width=14, anchor="w").pack(side=LEFT)
+        path_label = Label(row, textvariable=self.arch_vars[arch], anchor="w", fg="gray")
+        path_label.pack(side=LEFT, fill=X, expand=True)
+        Button(row, text="Browse...", command=lambda a=arch: self.pick_file(a)).pack(side=RIGHT)
+
+    def pick_file(self, arch):
+        path = filedialog.askopenfilename(title=f"Select APK for {arch}", filetypes=[("APK files", "*.apk")])
+        if path:
+            self.arch_vars[arch].set(path)
+
+    def log(self, message: str):
+        def append():
+            self.log_text.insert(END, message + "\n")
+            self.log_text.see(END)
+        self.root.after(0, append)
+
+    def start(self):
+        name = self.name_var.get().strip()
+        package_name = self.package_var.get().strip()
+        version = self.version_var.get().strip()
+        app_id = self.id_var.get().strip() or slugify(name)
+        description = self.description_text.get("1.0", END).strip()
+        token = self.token_var.get().strip()
+        arch_files = {arch: var.get().strip() for arch, var in self.arch_vars.items()}
+
+        if not name or not package_name or not version:
+            self.log("App name, package name, and version are required.")
+            return
+        if not any(arch_files.values()):
+            self.log("Select at least one APK file.")
+            return
+        if not token:
+            self.log("Enter a GitHub token with 'Contents: Read and write' on this repo.")
+            return
+
+        if self.remember_var.get():
+            save_token(token)
+
+        self.action_button.config(state="disabled")
+        self.log_text.delete("1.0", END)
+        threading.Thread(
+            target=self.run,
+            args=(token, app_id, name, package_name, version, description, arch_files),
+            daemon=True
+        ).start()
+
+    def run(self, token, app_id, name, package_name, version, description, arch_files):
+        try:
+            publish_app(token, app_id, name, package_name, version, description, arch_files, self.log)
+            self.log("\nDone.")
+        except Exception as e:
+            self.log(f"\nFAILED: {e}")
+        finally:
+            self.root.after(0, lambda: self.action_button.config(state="normal"))
+
+
+if __name__ == "__main__":
+    if sys.platform != "win32":
+        print("This tool targets Windows, but will still work on other desktop platforms.")
+    root = Tk()
+    AdminPanel(root)
+    root.mainloop()

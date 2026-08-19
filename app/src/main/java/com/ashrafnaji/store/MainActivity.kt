@@ -85,7 +85,7 @@ class MainActivity : AppCompatActivity() {
                 bindCard(CatalogItem(
                     id = "store", name = getString(R.string.app_name),
                     packageName = BuildConfig.APPLICATION_ID, type = "self",
-                    version = null, downloadUrl = null, description = null
+                    version = null, downloadUrl = null, downloadUrls = emptyMap(), description = null
                 ))
                 return@fetch
             }
@@ -136,9 +136,9 @@ class MainActivity : AppCompatActivity() {
             }
 
             card.actionButton.setOnClickListener {
-                val url = item.downloadUrl
+                val url = item.resolveDownloadUrl()
                 if (url == null) {
-                    card.statusText.text = "No download URL configured"
+                    card.statusText.text = "No APK available for this device's CPU"
                     return@setOnClickListener
                 }
                 card.actionButton.isEnabled = false

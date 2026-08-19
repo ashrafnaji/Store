@@ -1,5 +1,6 @@
 package com.ashrafnaji.store.catalog
 
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import com.ashrafnaji.store.BuildConfig
@@ -12,8 +13,9 @@ import java.net.URL
  *
  * `type = "self"` means this app (Store) — its APK is resolved dynamically via the existing
  * GitHub "latest release" + device-ABI lookup in [com.ashrafnaji.store.update.UpdateManager].
- * `type = "static"` means a fixed, pre-uploaded APK asset — [downloadUrl] and [version] come
- * straight from the catalog entry, no ABI matching.
+ * `type = "static"` means a fixed, pre-uploaded APK asset. [downloadUrls] maps ABI (e.g.
+ * "arm64-v8a") to that architecture's asset URL, for apps published per-architecture; [downloadUrl]
+ * is a single fallback URL used when no per-ABI match is found (or for a universal APK).
  */
 data class CatalogItem(
     val id: String,
@@ -22,8 +24,17 @@ data class CatalogItem(
     val type: String,
     val version: String?,
     val downloadUrl: String?,
+    val downloadUrls: Map<String, String>,
     val description: String?
-)
+) {
+    /** Picks the best download URL for this device: matching ABI first, then the fallback. */
+    fun resolveDownloadUrl(): String? {
+        for (abi in Build.SUPPORTED_ABIS) {
+            downloadUrls[abi]?.let { return it }
+        }
+        return downloadUrl ?: downloadUrls.values.firstOrNull()
+    }
+}
 
 /**
  * Fetches `catalog.json` from this repo's default branch and lists every app the Store should
@@ -62,6 +73,10 @@ object CatalogFetcher {
         val array = JSONArray(body)
         return (0 until array.length()).map { i ->
             val o = array.getJSONObject(i)
+            val urlsObj = o.optJSONObject("downloadUrls")
+            val urls = if (urlsObj == null) emptyMap() else {
+                urlsObj.keys().asSequence().associateWith { urlsObj.getString(it) }
+            }
             CatalogItem(
                 id = o.getString("id"),
                 name = o.getString("name"),
@@ -69,6 +84,7 @@ object CatalogFetcher {
                 type = o.optString("type", "static"),
                 version = o.optString("version").ifBlank { null },
                 downloadUrl = o.optString("downloadUrl").ifBlank { null },
+                downloadUrls = urls,
                 description = o.optString("description").ifBlank { null }
             )
         }
