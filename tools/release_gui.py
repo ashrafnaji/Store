@@ -131,7 +131,41 @@ def create_release_and_upload(token: str, version_name: str, apks, log):
         log(f"  done ({len(data) / 1024:.0f} KB)")
 
     log("All assets uploaded.")
+    update_latest_json(token, tag, version_name, log)
     log(release["html_url"])
+
+
+def update_latest_json(token: str, tag: str, version_name: str, log):
+    """
+    Updates latest.json on the main branch so the in-app updater (which reads it from
+    raw.githubusercontent.com to avoid the REST API's per-IP rate limit) sees this release.
+    """
+    log("Updating latest.json...")
+    import base64
+
+    manifest = {
+        "version": version_name,
+        "assets": {
+            abi: f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/download/{tag}/app-{abi}-release.apk"
+            for abi in ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+        },
+    }
+    content_b64 = base64.b64encode(json.dumps(manifest, indent=2).encode("utf-8")).decode("ascii")
+
+    contents_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/latest.json"
+    existing_sha = None
+    try:
+        existing = api_request(contents_url, token)
+        existing_sha = existing.get("sha")
+    except RuntimeError:
+        pass  # file doesn't exist yet
+
+    payload = {"message": f"Update latest.json for {tag}", "content": content_b64, "branch": "main"}
+    if existing_sha:
+        payload["sha"] = existing_sha
+
+    api_request(contents_url, token, method="PUT", data=json.dumps(payload).encode("utf-8"))
+    log("latest.json updated.")
 
 
 class ReleaserApp:

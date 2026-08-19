@@ -18,3 +18,4 @@ keystore.properties
 
 # Debug screenshots taken during ADB testing
 tools/screen*.png
+tools/s*.png

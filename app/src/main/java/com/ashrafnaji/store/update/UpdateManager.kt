@@ -104,31 +104,29 @@ object UpdateManager {
         }.start()
     }
 
-    /** Returns (versionName, downloadUrlForThisAbi?) or null if the request failed. */
+    /**
+     * Returns (versionName, downloadUrlForThisAbi?) or null if the request failed.
+     *
+     * Reads `latest.json` from the repo's raw content CDN rather than calling
+     * `api.github.com/repos/.../releases/latest`: the REST API caps unauthenticated requests
+     * at 60/hour per IP, which a single shared network (e.g. several units behind one router)
+     * can burn through in minutes. raw.githubusercontent.com isn't subject to that limit.
+     */
     private fun fetchLatestRelease(): Pair<String, String?>? {
-        val url = URL("https://api.github.com/repos/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPO}/releases/latest")
+        val url = URL("https://raw.githubusercontent.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPO}/main/latest.json")
         val conn = url.openConnection() as HttpURLConnection
-        conn.setRequestProperty("Accept", "application/vnd.github+json")
         conn.connectTimeout = 15_000
         conn.readTimeout = 15_000
         try {
             if (conn.responseCode != HttpURLConnection.HTTP_OK) return null
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             val json = JSONObject(body)
-            val tagName = json.getString("tag_name").removePrefix("v")
-            val assets = json.getJSONArray("assets")
+            val versionName = json.getString("version")
+            val assets = json.getJSONObject("assets")
 
             val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
-            var downloadUrl: String? = null
-            for (i in 0 until assets.length()) {
-                val asset = assets.getJSONObject(i)
-                val name = asset.getString("name")
-                if (name.contains(abi) && name.endsWith(".apk")) {
-                    downloadUrl = asset.getString("browser_download_url")
-                    break
-                }
-            }
-            return tagName to downloadUrl
+            val downloadUrl = if (assets.has(abi)) assets.getString(abi) else null
+            return versionName to downloadUrl
         } finally {
             conn.disconnect()
         }
