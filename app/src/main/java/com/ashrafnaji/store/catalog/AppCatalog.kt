@@ -27,12 +27,22 @@ data class CatalogItem(
     val downloadUrls: Map<String, String>,
     val description: String?
 ) {
-    /** Picks the best download URL for this device: matching ABI first, then the fallback. */
+    /**
+     * Picks the download URL for this device's ABI, or null if this app has no build for it.
+     *
+     * [downloadUrl] is only a fallback for entries with no [downloadUrls] map at all (a
+     * universal APK, or an old-style catalog entry) -- once an entry lists specific
+     * architectures, a device whose ABI isn't in that list must not match, even if
+     * [downloadUrl] happens to be set (the admin panel always sets it to one of the uploaded
+     * per-ABI assets for backward compatibility, so treating it as a blanket fallback here
+     * would offer e.g. an x86-only build to an arm64 device).
+     */
     fun resolveDownloadUrl(): String? {
+        if (downloadUrls.isEmpty()) return downloadUrl
         for (abi in Build.SUPPORTED_ABIS) {
             downloadUrls[abi]?.let { return it }
         }
-        return downloadUrl ?: downloadUrls.values.firstOrNull()
+        return null
     }
 }
 
