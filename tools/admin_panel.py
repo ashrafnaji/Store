@@ -65,18 +65,27 @@ def inspect_apk(apk_path: str):
     if not aapt:
         return None
 
+    # aapt's output is UTF-8 regardless of the system codepage; on Windows, text=True defaults
+    # to cp1252, which raises UnicodeDecodeError on any non-Latin byte (e.g. in a permission or
+    # label string) and silently leaves .stdout as None, crashing the regex calls below.
     output = subprocess.run(
         [aapt, "dump", "badging", apk_path],
-        capture_output=True, text=True, timeout=30
+        capture_output=True, text=True, timeout=30, encoding="utf-8", errors="replace"
     ).stdout
 
     package_match = re.search(r"package: name='([^']+)'.*?versionName='([^']*)'", output)
     label_match = re.search(r"application-label:'([^']*)'", output)
     native_code_match = re.search(r"native-code: (.+)", output)
+    # A universal/fat APK with native libs for every ABI gets split across two lines: aapt
+    # reports one ABI as "native-code" and the rest as "alt-native-code" -- both mean "present
+    # in this APK", so they need to be combined, not just the first.
+    alt_native_code_match = re.search(r"alt-native-code: (.+)", output)
 
     abis = []
     if native_code_match:
         abis = re.findall(r"'([^']+)'", native_code_match.group(1))
+    if alt_native_code_match:
+        abis += re.findall(r"'([^']+)'", alt_native_code_match.group(1))
 
     return {
         "package_name": package_match.group(1) if package_match else "",
