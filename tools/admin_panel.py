@@ -221,6 +221,7 @@ class AdminPanel:
         autofill_row = Frame(form)
         autofill_row.pack(fill=X, pady=(0, 10))
         Button(autofill_row, text="Auto-fill from APK...", command=self.autofill_from_apk).pack(side=LEFT)
+        Button(autofill_row, text="Clear Form", command=self.reset_form).pack(side=LEFT, padx=(6, 0))
         Label(
             autofill_row,
             text="  reads name/package/version and detects supported architectures automatically",
@@ -280,6 +281,16 @@ class AdminPanel:
             self.arch_vars[arch].set(path)
             self.arch_check_vars[arch].set(True)
 
+    def reset_form(self):
+        self.name_var.set("")
+        self.package_var.set("")
+        self.version_var.set("")
+        self.id_var.set("")
+        self.description_text.delete("1.0", END)
+        for arch in ARCHS:
+            self.arch_vars[arch].set("")
+            self.arch_check_vars[arch].set(False)
+
     def autofill_from_apk(self):
         path = filedialog.askopenfilename(title="Select APK to inspect", filetypes=[("APK files", "*.apk")])
         if not path:
@@ -293,11 +304,19 @@ class AdminPanel:
             )
             return
 
-        if info["app_label"] and not self.name_var.get().strip():
+        # A second auto-fill for a *different* package means the admin is starting a new app
+        # entry -- reset everything first, otherwise the form silently keeps the previous app's
+        # name/package/version (they only ever got filled once, the first time the fields were
+        # empty) and it looks like auto-fill "stopped working" without restarting the tool.
+        current_package = self.package_var.get().strip()
+        if current_package and info["package_name"] and info["package_name"] != current_package:
+            self.reset_form()
+
+        if info["app_label"]:
             self.name_var.set(info["app_label"])
-        if info["package_name"] and not self.package_var.get().strip():
+        if info["package_name"]:
             self.package_var.set(info["package_name"])
-        if info["version_name"] and not self.version_var.get().strip():
+        if info["version_name"]:
             self.version_var.set(info["version_name"])
 
         abis = info["abis"]
