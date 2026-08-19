@@ -22,3 +22,6 @@ tools/s*.png
 tools/final.png
 tools/v*.png
 __pycache__/
+tools/c*.png
+tools/rv*.png
+.claude/

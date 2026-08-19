@@ -1,7 +1,9 @@
 package com.ashrafnaji.store
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -137,6 +139,15 @@ class MainActivity : AppCompatActivity() {
                     card.statusText.text = "Up to date"
                     card.actionButton.text = "Installed"
                 }
+            }
+
+            card.uninstallButton.visibility = if (installed != null) android.view.View.VISIBLE else android.view.View.GONE
+            card.uninstallButton.setOnClickListener {
+                val uninstallIntent = Intent(Intent.ACTION_DELETE).apply {
+                    data = Uri.parse("package:${item.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(uninstallIntent)
             }
 
             card.actionButton.setOnClickListener {
