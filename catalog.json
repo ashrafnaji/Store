@@ -35,5 +35,17 @@
     "version": "4.0.5",
     "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/app-manager-v4.0.5/app-manager.apk",
     "description": "Open-source app manager: browse, backup, and control installed apps and their permissions/components."
+  },
+  {
+    "id": "morelocale-2",
+    "name": "MoreLocale 2",
+    "packageName": "jp.co.c_lis.ccl.morelocale",
+    "type": "static",
+    "version": "2.4.7",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/morelocale-2-v2.4.7/morelocale-2-x86_64.apk",
+    "downloadUrls": {
+      "x86_64": "https://github.com/ashrafnaji/Store/releases/download/morelocale-2-v2.4.7/morelocale-2-x86_64.apk"
+    },
+    "description": ""
   }
 ]
