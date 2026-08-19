@@ -13,5 +13,18 @@
     "version": "5.32",
     "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/v1.0.1/key.apk",
     "description": "A simple, small, customizable on-screen keyboard."
+  },
+  {
+    "id": "youtube-revanced",
+    "name": "YouTube ReVanced",
+    "packageName": "app.revanced.android.youtube",
+    "type": "static",
+    "version": "21.10.496",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/youtube-revanced-v21.10.496/youtube-revanced-arm64-v8a.apk",
+    "downloadUrls": {
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/youtube-revanced-v21.10.496/youtube-revanced-arm64-v8a.apk",
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/youtube-revanced-v21.10.496/youtube-revanced-armeabi-v7a.apk"
+    },
+    "description": ""
   }
 ]
