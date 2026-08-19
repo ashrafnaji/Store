@@ -91,7 +91,14 @@ class MainActivity : AppCompatActivity() {
                 ))
                 return@fetch
             }
-            items.forEach { bindCard(it) }
+            items.forEach { item ->
+                // Hide catalog entries that aren't installed and have no asset matching this
+                // device's CPU -- e.g. an x86-only upload shouldn't show as installable on arm64.
+                val installed = item.type != "self" && installedVersion(item.packageName) != null
+                if (item.type == "self" || installed || item.resolveDownloadUrl() != null) {
+                    bindCard(item)
+                }
+            }
         }
     }
 
@@ -149,6 +156,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 startActivity(uninstallIntent)
             }
+
+            val launchIntent = if (installed != null) packageManager.getLaunchIntentForPackage(item.packageName) else null
+            card.openButton.visibility = if (launchIntent != null) android.view.View.VISIBLE else android.view.View.GONE
+            card.openButton.setOnClickListener { startActivity(launchIntent) }
 
             card.actionButton.setOnClickListener {
                 val url = item.resolveDownloadUrl()

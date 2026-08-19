@@ -25,3 +25,6 @@ __pycache__/
 tools/c*.png
 tools/rv*.png
 .claude/
+tools/am*.png
+tools/u*.png
+tools/ui.xml
