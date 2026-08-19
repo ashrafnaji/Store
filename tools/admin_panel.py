@@ -179,14 +179,28 @@ def publish_app(token, app_id, name, package_name, version, description, arch_fi
     release = get_or_create_release(token, tag, f"{name} v{version}", log)
     upload_url = release["upload_url"].split("{")[0]
 
-    download_urls = {}
+    # Multiple architecture slots often point at the exact same local file -- a universal APK
+    # with no native libs (auto-fill assigns it to all four), or one that bundles native code
+    # for every ABI in a single build. Upload each distinct file only once instead of
+    # re-uploading identical bytes per architecture, and point every arch that shares it at the
+    # same asset.
+    groups = {}
     for arch, file_path in arch_files.items():
         if not file_path:
             continue
-        asset_name = f"{app_id}-{arch}.apk"
+        key = str(Path(file_path).resolve())
+        groups.setdefault(key, {"path": file_path, "archs": []})["archs"].append(arch)
+
+    download_urls = {}
+    for group in groups.values():
+        archs = group["archs"]
+        suffix = "universal" if set(archs) == set(arch_files.keys()) else "-".join(sorted(archs))
+        asset_name = f"{app_id}-{suffix}.apk"
         delete_asset_if_present(token, release, asset_name, log)
-        upload_asset(token, upload_url, file_path, asset_name, log)
-        download_urls[arch] = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/download/{tag}/{asset_name}"
+        upload_asset(token, upload_url, group["path"], asset_name, log)
+        url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/download/{tag}/{asset_name}"
+        for arch in archs:
+            download_urls[arch] = url
 
     if not download_urls:
         raise RuntimeError("No APK files selected for any architecture.")
