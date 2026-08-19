@@ -47,5 +47,20 @@
       "x86_64": "https://github.com/ashrafnaji/Store/releases/download/morelocale-2-v2.4.7/morelocale-2-x86_64.apk"
     },
     "description": ""
+  },
+  {
+    "id": "microg-services",
+    "name": "microG Services",
+    "packageName": "app.revanced.android.gms",
+    "type": "static",
+    "version": "0.3.13.2.250932",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/microg-services-v0.3.13.2.250932/microg-services-universal.apk",
+    "downloadUrls": {
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/microg-services-v0.3.13.2.250932/microg-services-universal.apk",
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/microg-services-v0.3.13.2.250932/microg-services-universal.apk",
+      "x86": "https://github.com/ashrafnaji/Store/releases/download/microg-services-v0.3.13.2.250932/microg-services-universal.apk",
+      "x86_64": "https://github.com/ashrafnaji/Store/releases/download/microg-services-v0.3.13.2.250932/microg-services-universal.apk"
+    },
+    "description": ""
   }
 ]
