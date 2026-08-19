@@ -216,6 +216,7 @@ class AdminPanel:
         self.token_var = StringVar(value=load_saved_token())
         self.remember_var = BooleanVar(value=bool(load_saved_token()))
         self.arch_vars = {arch: StringVar() for arch in ARCHS}
+        self.arch_check_vars = {arch: BooleanVar() for arch in ARCHS}
 
         autofill_row = Frame(form)
         autofill_row.pack(fill=X, pady=(0, 10))
@@ -235,7 +236,7 @@ class AdminPanel:
         self.description_text = Text(form, height=3, wrap="word")
         self.description_text.pack(fill=X)
 
-        Label(form, text="APK per architecture (leave blank to skip):", anchor="w").pack(fill=X, pady=(12, 4))
+        Label(form, text="Architectures to publish:", anchor="w").pack(fill=X, pady=(12, 4))
         for arch in ARCHS:
             self._arch_row(form, arch)
 
@@ -267,7 +268,8 @@ class AdminPanel:
     def _arch_row(self, parent, arch):
         row = Frame(parent)
         row.pack(fill=X, pady=2)
-        Label(row, text=arch, width=14, anchor="w").pack(side=LEFT)
+        Checkbutton(row, variable=self.arch_check_vars[arch]).pack(side=LEFT)
+        Label(row, text=arch, width=13, anchor="w").pack(side=LEFT)
         path_label = Label(row, textvariable=self.arch_vars[arch], anchor="w", fg="gray")
         path_label.pack(side=LEFT, fill=X, expand=True)
         Button(row, text="Browse...", command=lambda a=arch: self.pick_file(a)).pack(side=RIGHT)
@@ -276,6 +278,7 @@ class AdminPanel:
         path = filedialog.askopenfilename(title=f"Select APK for {arch}", filetypes=[("APK files", "*.apk")])
         if path:
             self.arch_vars[arch].set(path)
+            self.arch_check_vars[arch].set(True)
 
     def autofill_from_apk(self):
         path = filedialog.askopenfilename(title="Select APK to inspect", filetypes=[("APK files", "*.apk")])
@@ -302,12 +305,14 @@ class AdminPanel:
             matched = [a for a in abis if a in self.arch_vars]
             for arch in matched:
                 self.arch_vars[arch].set(path)
-            self.log(f"{Path(path).name}: detected architectures {', '.join(matched) or abis} -> assigned to matching slot(s).")
+                self.arch_check_vars[arch].set(True)
+            self.log(f"{Path(path).name}: detected architectures {', '.join(matched) or abis} -> checked matching slot(s).")
         else:
             # No native-code line means no native libraries -- this single APK runs on every ABI.
             for arch in ARCHS:
                 self.arch_vars[arch].set(path)
-            self.log(f"{Path(path).name}: no native libraries detected -> this APK works on all architectures, assigned to every slot.")
+                self.arch_check_vars[arch].set(True)
+            self.log(f"{Path(path).name}: no native libraries detected -> this APK works on all architectures, checked every slot.")
 
     def log(self, message: str):
         def append():
@@ -322,13 +327,20 @@ class AdminPanel:
         app_id = self.id_var.get().strip() or slugify(name)
         description = self.description_text.get("1.0", END).strip()
         token = self.token_var.get().strip()
-        arch_files = {arch: var.get().strip() for arch, var in self.arch_vars.items()}
+        # Only architectures with both a file selected and their checkbox ticked are published --
+        # this lets an auto-fill assign a universal APK to all four slots while still letting the
+        # admin uncheck the ones they don't actually want to publish for.
+        arch_files = {
+            arch: self.arch_vars[arch].get().strip()
+            for arch in ARCHS
+            if self.arch_check_vars[arch].get() and self.arch_vars[arch].get().strip()
+        }
 
         if not name or not package_name or not version:
             self.log("App name, package name, and version are required.")
             return
-        if not any(arch_files.values()):
-            self.log("Select at least one APK file.")
+        if not arch_files:
+            self.log("Select at least one architecture (check its box and pick an APK file).")
             return
         if not token:
             self.log("Enter a GitHub token with 'Contents: Read and write' on this repo.")
