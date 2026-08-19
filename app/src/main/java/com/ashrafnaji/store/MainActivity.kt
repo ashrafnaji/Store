@@ -106,9 +106,11 @@ class MainActivity : AppCompatActivity() {
 
         card.appNameText.text = item.name
         card.appDeveloperText.text = "by ${BuildConfig.GITHUB_OWNER}"
-        card.appDescriptionText.text = item.description ?: "Loading..."
 
         if (item.type == "self") {
+            // Store's own description isn't in catalog.json -- it's fetched from the GitHub
+            // repo, so "Loading..." is a real transient state here.
+            card.appDescriptionText.text = item.description ?: "Loading..."
             card.versionText.text = "Installed version ${BuildConfig.VERSION_NAME}"
             UpdateManager.fetchRepoDescription { description ->
                 card.appDescriptionText.text = description ?: "No description available."
@@ -116,6 +118,8 @@ class MainActivity : AppCompatActivity() {
             card.actionButton.setOnClickListener { checkSelfUpdate(card) }
             checkSelfUpdate(card)
         } else {
+            // Static catalog entries have no follow-up fetch, so show the final state immediately.
+            card.appDescriptionText.text = item.description ?: "No description available."
             val installed = installedVersion(item.packageName)
             card.versionText.text = if (installed != null) "Installed version $installed" else "Not installed"
 
