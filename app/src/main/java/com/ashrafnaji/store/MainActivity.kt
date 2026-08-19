@@ -24,7 +24,10 @@ class MainActivity : AppCompatActivity() {
     private val storagePermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { loadCatalog() }
 
-    private var hasLoadedOnce = false
+    // onResume fires immediately after onCreate on first launch, which would otherwise race
+    // the initial loadCatalog() call and render every card twice. Only the most recent call's
+    // async result is allowed to actually render.
+    private var loadGeneration = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,12 +50,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var isFirstResume = true
+
     override fun onResume() {
         super.onResume()
         // Installs are confirmed in a system dialog outside our process (and, for self-updates,
         // this Activity gets killed and relaunched by the system). Re-check installed versions
-        // whenever the user comes back so cards don't stay stuck on "Installing...".
-        if (hasLoadedOnce) {
+        // whenever the user comes back so cards don't stay stuck on "Installing...". Skip the
+        // very first onResume, which fires right after onCreate already triggered a load.
+        if (isFirstResume) {
+            isFirstResume = false
+        } else {
             loadCatalog()
         }
     }
@@ -67,9 +75,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadCatalog() {
-        hasLoadedOnce = true
+        val generation = ++loadGeneration
         binding.appListContainer.removeAllViews()
         CatalogFetcher.fetch { items ->
+            if (generation != loadGeneration) return@fetch // a newer load superseded this one
+
             if (items == null) {
                 // Fall back to just showing this app so the store isn't empty on network error.
                 bindCard(CatalogItem(
