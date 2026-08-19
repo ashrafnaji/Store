@@ -12,7 +12,9 @@ Reuses the same saved-token file as release_gui.py: %USERPROFILE%\\.store_releas
 import base64
 import json
 import mimetypes
+import os
 import re
+import subprocess
 import sys
 import threading
 import urllib.error
@@ -27,6 +29,61 @@ REPO_OWNER = "ashrafnaji"
 REPO_NAME = "Store"
 ARCHS = ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"]
 CONFIG_PATH = Path.home() / ".store_releaser" / "config.json"
+
+
+def find_aapt():
+    """Locates aapt(.exe) from the Android SDK, if one is installed on this machine."""
+    from shutil import which
+    found = which("aapt") or which("aapt.exe")
+    if found:
+        return found
+
+    sdk_roots = [os.environ.get("ANDROID_HOME"), os.environ.get("ANDROID_SDK_ROOT")]
+    sdk_roots.append(str(Path.home() / "AppData" / "Local" / "Android" / "Sdk"))
+    for root in sdk_roots:
+        if not root:
+            continue
+        build_tools = Path(root) / "build-tools"
+        if not build_tools.exists():
+            continue
+        candidates = sorted(build_tools.glob("*/aapt.exe"), reverse=True) or sorted(build_tools.glob("*/aapt"), reverse=True)
+        if candidates:
+            return str(candidates[0])
+    return None
+
+
+def inspect_apk(apk_path: str):
+    """
+    Reads package name, versionName, app label, and supported ABIs straight out of the APK
+    using aapt (part of the Android SDK build-tools). Returns None if aapt isn't available --
+    callers should fall back to asking the admin to fill fields in manually.
+
+    An APK with no "native-code:" line has no native libraries, so it runs on every ABI
+    ("sometimes 1 apk works on all") -- that's reported as abis=[] (meaning: all of them).
+    """
+    aapt = find_aapt()
+    if not aapt:
+        return None
+
+    output = subprocess.run(
+        [aapt, "dump", "badging", apk_path],
+        capture_output=True, text=True, timeout=30
+    ).stdout
+
+    package_match = re.search(r"package: name='([^']+)'.*?versionName='([^']*)'", output)
+    label_match = re.search(r"application-label:'([^']*)'", output)
+    native_code_match = re.search(r"native-code: (.+)", output)
+
+    abis = []
+    if native_code_match:
+        abis = re.findall(r"'([^']+)'", native_code_match.group(1))
+
+    return {
+        "package_name": package_match.group(1) if package_match else "",
+        "version_name": package_match.group(2) if package_match else "",
+        "app_label": label_match.group(1) if label_match else "",
+        "abis": abis,  # empty list == no native libs == works on every architecture
+    }
 
 
 def load_saved_token():
@@ -160,6 +217,15 @@ class AdminPanel:
         self.remember_var = BooleanVar(value=bool(load_saved_token()))
         self.arch_vars = {arch: StringVar() for arch in ARCHS}
 
+        autofill_row = Frame(form)
+        autofill_row.pack(fill=X, pady=(0, 10))
+        Button(autofill_row, text="Auto-fill from APK...", command=self.autofill_from_apk).pack(side=LEFT)
+        Label(
+            autofill_row,
+            text="  reads name/package/version and detects supported architectures automatically",
+            fg="gray"
+        ).pack(side=LEFT)
+
         self._row(form, "App name:", self.name_var)
         self._row(form, "Package name:", self.package_var, placeholder="com.example.app")
         self._row(form, "Version (e.g. 1.0.0):", self.version_var)
@@ -210,6 +276,38 @@ class AdminPanel:
         path = filedialog.askopenfilename(title=f"Select APK for {arch}", filetypes=[("APK files", "*.apk")])
         if path:
             self.arch_vars[arch].set(path)
+
+    def autofill_from_apk(self):
+        path = filedialog.askopenfilename(title="Select APK to inspect", filetypes=[("APK files", "*.apk")])
+        if not path:
+            return
+
+        info = inspect_apk(path)
+        if info is None:
+            self.log(
+                "Couldn't auto-detect: no 'aapt' found on this PC (part of the Android SDK "
+                "build-tools). Fill in the fields and pick per-architecture files manually."
+            )
+            return
+
+        if info["app_label"] and not self.name_var.get().strip():
+            self.name_var.set(info["app_label"])
+        if info["package_name"] and not self.package_var.get().strip():
+            self.package_var.set(info["package_name"])
+        if info["version_name"] and not self.version_var.get().strip():
+            self.version_var.set(info["version_name"])
+
+        abis = info["abis"]
+        if abis:
+            matched = [a for a in abis if a in self.arch_vars]
+            for arch in matched:
+                self.arch_vars[arch].set(path)
+            self.log(f"{Path(path).name}: detected architectures {', '.join(matched) or abis} -> assigned to matching slot(s).")
+        else:
+            # No native-code line means no native libraries -- this single APK runs on every ABI.
+            for arch in ARCHS:
+                self.arch_vars[arch].set(path)
+            self.log(f"{Path(path).name}: no native libraries detected -> this APK works on all architectures, assigned to every slot.")
 
     def log(self, message: str):
         def append():

@@ -21,3 +21,4 @@ tools/screen*.png
 tools/s*.png
 tools/final.png
 tools/v*.png
+__pycache__/
