@@ -64,3 +64,20 @@ Open the folder in Android Studio (Hedgehog+) and let it sync — it will genera
 Gradle wrapper automatically. `assembleRelease` falls back to debug signing locally if
 `keystore.properties` / the env vars above aren't set, so it builds without secrets; that
 build just won't be installable as an *update* over a properly-signed release build.
+
+## One-click release from Windows (`tools/release_gui.py`)
+
+A small Tkinter app (stdlib only, no `pip install` needed) that builds the release APKs
+and publishes them as a GitHub Release in one step — an alternative to tagging + CI.
+
+```
+python tools\release_gui.py
+```
+
+Fill in the version (e.g. `1.0.1`) and a GitHub token scoped to `Contents: Read and
+write` on this repo, then click **Build && Release**. It runs `gradle assembleRelease`
+locally (needs the same JDK/Android SDK/`keystore.properties` as any local build), then
+creates release `v<version>` and uploads all 4 ABI APKs to it.
+
+The token is only kept in memory unless you check "Remember on this PC", in which case
+it's saved to `%USERPROFILE%\.store_releaser\config.json` — never inside the repo.
