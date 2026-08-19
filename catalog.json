@@ -26,5 +26,14 @@
       "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/youtube-revanced-v21.10.496/youtube-revanced-armeabi-v7a.apk"
     },
     "description": ""
+  },
+  {
+    "id": "app-manager",
+    "name": "App Manager",
+    "packageName": "io.github.muntashirakon.AppManager",
+    "type": "static",
+    "version": "4.0.5",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/app-manager-v4.0.5/app-manager.apk",
+    "description": "Open-source app manager: browse, backup, and control installed apps and their permissions/components."
   }
 ]
