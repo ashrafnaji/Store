@@ -20,17 +20,17 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Checks the GitHub repo's latest release for a newer version, downloads the APK asset that
- * matches the device's CPU ABI, and installs it via [PackageInstaller]. If the install fails
- * (e.g. STATUS_FAILURE_CONFLICT from a signing-key mismatch between builds), it falls back to
- * uninstalling the current app and prompting the user to finish installing the downloaded APK.
+ * Downloads an APK (either this app's own latest GitHub release, or an arbitrary catalog
+ * entry's asset) and installs it via [PackageInstaller]. If the install fails (e.g.
+ * STATUS_FAILURE_CONFLICT from a signing-key mismatch between builds), it falls back to
+ * uninstalling whatever's currently installed under that package name and prompting the user
+ * to finish installing the downloaded APK.
  */
 object UpdateManager {
 
-    private const val TAG = "UpdateManager"
     const val EXTRA_APK_URI = "com.ashrafnaji.store.EXTRA_APK_URI"
+    const val EXTRA_PACKAGE_NAME = "com.ashrafnaji.store.EXTRA_PACKAGE_NAME"
     private const val NOTIF_CHANNEL_ID = "app_update"
-    private const val NOTIF_ID = 1001
 
     interface Listener {
         fun onStatus(message: String)
@@ -40,6 +40,7 @@ object UpdateManager {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /** Checks this app's own latest GitHub release and self-updates if newer. */
     fun checkAndUpdate(context: Context, listener: Listener) {
         Thread {
             try {
@@ -58,10 +59,18 @@ object UpdateManager {
                     return@Thread
                 }
                 mainHandler.post { listener.onStatus("Downloading version $versionName...") }
-                downloadAndInstall(context.applicationContext, downloadUrl, versionName, listener)
+                downloadAndInstall(context.applicationContext, downloadUrl, context.packageName, "Store $versionName", listener)
             } catch (e: Exception) {
                 postError(listener, e.message ?: "Update check failed")
             }
+        }.start()
+    }
+
+    /** Downloads and installs a specific APK for an arbitrary catalog entry. */
+    fun installFromUrl(context: Context, downloadUrl: String, packageName: String, label: String, listener: Listener) {
+        Thread {
+            mainHandler.post { listener.onStatus("Downloading $label...") }
+            downloadAndInstall(context.applicationContext, downloadUrl, packageName, label, listener)
         }.start()
     }
 
@@ -124,7 +133,7 @@ object UpdateManager {
         }
     }
 
-    private fun isNewer(remote: String, local: String): Boolean {
+    fun isNewer(remote: String, local: String): Boolean {
         val r = remote.split(".").map { it.toIntOrNull() ?: 0 }
         val l = local.split(".").map { it.toIntOrNull() ?: 0 }
         for (i in 0 until maxOf(r.size, l.size)) {
@@ -135,12 +144,19 @@ object UpdateManager {
         return false
     }
 
-    private fun downloadAndInstall(context: Context, downloadUrl: String, versionName: String, listener: Listener) {
+    private fun downloadAndInstall(
+        context: Context,
+        downloadUrl: String,
+        packageName: String,
+        label: String,
+        listener: Listener
+    ) {
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val fileName = "${packageName}-${System.currentTimeMillis()}.apk"
         val request = DownloadManager.Request(Uri.parse(downloadUrl))
-            .setTitle("Store update $versionName")
+            .setTitle("Installing $label")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "store-$versionName.apk")
+            .setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, fileName)
 
         val downloadId = downloadManager.enqueue(request)
 
@@ -168,8 +184,8 @@ object UpdateManager {
                     postError(listener, "Downloaded file not found")
                     return
                 }
-                mainHandler.post { listener.onStatus("Installing version $versionName...") }
-                installApk(context, apkUri, listener)
+                mainHandler.post { listener.onStatus("Installing $label...") }
+                installApk(context, apkUri, packageName, listener)
             }
         }
         val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
@@ -181,7 +197,7 @@ object UpdateManager {
         }
     }
 
-    private fun installApk(context: Context, apkUri: Uri, listener: Listener) {
+    private fun installApk(context: Context, apkUri: Uri, packageName: String, listener: Listener) {
         try {
             val packageInstaller = context.packageManager.packageInstaller
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
@@ -191,7 +207,7 @@ object UpdateManager {
             session.use { s ->
                 context.contentResolver.openInputStream(apkUri).use { input ->
                     requireNotNull(input) { "Cannot open downloaded APK" }
-                    s.openWrite("store_update", 0, -1).use { out ->
+                    s.openWrite("update", 0, -1).use { out ->
                         input.copyTo(out)
                         s.fsync(out)
                     }
@@ -199,6 +215,7 @@ object UpdateManager {
 
                 val resultIntent = Intent(context, InstallResultReceiver::class.java).apply {
                     putExtra(EXTRA_APK_URI, apkUri.toString())
+                    putExtra(EXTRA_PACKAGE_NAME, packageName)
                 }
                 val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
                 val pendingIntent = PendingIntent.getBroadcast(context, sessionId, resultIntent, flags)
@@ -213,18 +230,18 @@ object UpdateManager {
      * Called by [InstallResultReceiver] when a session install fails outright (not just
      * pending user confirmation) — most commonly STATUS_FAILURE_CONFLICT when the downloaded
      * APK is signed with a different key than the currently installed app. Since a plain app
-     * cannot silently replace its own signature, remove the old app first, then let the user
-     * tap the still-downloaded APK (kept alive by the system Download provider, independent of
-     * this app's process) to finish installing the new one.
+     * cannot silently replace another app's signature, remove the old one first, then let the
+     * user tap the still-downloaded APK (kept alive by the system Download provider,
+     * independent of any app's process) to finish installing the new one.
      */
-    fun handleInstallFailure(context: Context, apkUriString: String?) {
-        if (apkUriString == null) return
+    fun handleInstallFailure(context: Context, packageName: String?, apkUriString: String?) {
+        if (apkUriString == null || packageName == null) return
         val apkUri = Uri.parse(apkUriString)
 
         postFinishInstallNotification(context, apkUri)
 
         val uninstallIntent = Intent(Intent.ACTION_DELETE).apply {
-            data = Uri.parse("package:${context.packageName}")
+            data = Uri.parse("package:$packageName")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(uninstallIntent)
@@ -247,7 +264,7 @@ object UpdateManager {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         val pendingIntent = PendingIntent.getActivity(
-            context, 0, installIntent,
+            context, apkUri.hashCode(), installIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -260,6 +277,6 @@ object UpdateManager {
             .setOngoing(true)
             .build()
 
-        notificationManager.notify(NOTIF_ID, notification)
+        notificationManager.notify(apkUri.hashCode(), notification)
     }
 }

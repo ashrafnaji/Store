@@ -33,7 +33,8 @@ class InstallResultReceiver : BroadcastReceiver() {
                 // Most commonly STATUS_FAILURE_CONFLICT: the new APK's signing key doesn't
                 // match the installed app's. Fall back to uninstall-then-reinstall.
                 val apkUriString = intent.getStringExtra(UpdateManager.EXTRA_APK_URI)
-                UpdateManager.handleInstallFailure(context, apkUriString)
+                val packageName = intent.getStringExtra(UpdateManager.EXTRA_PACKAGE_NAME)
+                UpdateManager.handleInstallFailure(context, packageName, apkUriString)
             }
         }
     }

@@ -1,0 +1,17 @@
+[
+  {
+    "id": "store",
+    "name": "Store",
+    "packageName": "com.ashrafnaji.store",
+    "type": "self"
+  },
+  {
+    "id": "key",
+    "name": "Simple Keyboard",
+    "packageName": "rkr.simplekeyboard.inputmethod",
+    "type": "static",
+    "version": "5.32",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/v1.0.1/key.apk",
+    "description": "A simple, small, customizable on-screen keyboard."
+  }
+]
