@@ -81,7 +81,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:text="Uninstall"
+            android:text="@string/uninstall"
             android:visibility="gone" />
 
         <Button
@@ -89,14 +89,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:text="Open"
+            android:text="@string/open"
             android:visibility="gone" />
 
         <Button
             android:id="@+id/actionButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Install" />
+            android:text="@string/install" />
 
     </LinearLayout>
 

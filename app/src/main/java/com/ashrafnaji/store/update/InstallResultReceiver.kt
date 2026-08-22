@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
 import android.widget.Toast
+import com.ashrafnaji.store.R
 
 /** Receives the result of a [PackageInstaller] session commit started by [UpdateManager]. */
 class InstallResultReceiver : BroadcastReceiver() {
@@ -26,7 +27,7 @@ class InstallResultReceiver : BroadcastReceiver() {
             }
 
             PackageInstaller.STATUS_SUCCESS -> {
-                Toast.makeText(context, "Update installed", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.update_installed, Toast.LENGTH_SHORT).show()
             }
 
             else -> {

@@ -1,5 +1,7 @@
 <resources>
-    <color name="purple_500">#FF6200EE</color>
+    <color name="brand_turquoise">#2CC9BE</color>
+    <color name="brand_turquoise_dark">#087F78</color>
+    <color name="brand_black">#080A0A</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

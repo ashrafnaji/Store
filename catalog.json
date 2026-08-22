@@ -1,7 +1,7 @@
 [
   {
     "id": "store",
-    "name": "Store",
+    "name": "AutoExpert Store",
     "packageName": "com.ashrafnaji.store",
     "type": "self"
   },

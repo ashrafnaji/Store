@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.ashrafnaji.store.BuildConfig
+import com.ashrafnaji.store.R
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -47,22 +48,28 @@ object UpdateManager {
             try {
                 val release = fetchLatestRelease()
                 if (release == null) {
-                    postError(listener, "Could not reach GitHub releases")
+                    postError(listener, context.getString(R.string.error_github_releases))
                     return@Thread
                 }
                 val (versionName, downloadUrl) = release
                 if (downloadUrl == null) {
-                    postError(listener, "No APK found for this device's CPU (${Build.SUPPORTED_ABIS.joinToString()})")
+                    postError(
+                        listener,
+                        context.getString(R.string.error_no_device_apk, Build.SUPPORTED_ABIS.joinToString())
+                    )
                     return@Thread
                 }
                 if (!isNewer(versionName, BuildConfig.VERSION_NAME)) {
                     mainHandler.post { listener.onUpToDate() }
                     return@Thread
                 }
-                mainHandler.post { listener.onStatus("Downloading version $versionName...") }
-                downloadAndInstall(context.applicationContext, downloadUrl, context.packageName, "Store $versionName", listener)
+                mainHandler.post {
+                    listener.onStatus(context.getString(R.string.status_downloading_version, versionName))
+                }
+                val label = context.getString(R.string.self_update_label, versionName)
+                downloadAndInstall(context.applicationContext, downloadUrl, context.packageName, label, listener)
             } catch (e: Exception) {
-                postError(listener, e.message ?: "Update check failed")
+                postError(listener, e.message ?: context.getString(R.string.error_update_check))
             }
         }.start()
     }
@@ -70,7 +77,9 @@ object UpdateManager {
     /** Downloads and installs a specific APK for an arbitrary catalog entry. */
     fun installFromUrl(context: Context, downloadUrl: String, packageName: String, label: String, listener: Listener) {
         Thread {
-            mainHandler.post { listener.onStatus("Downloading $label...") }
+            mainHandler.post {
+                listener.onStatus(context.getString(R.string.status_downloading_app, label))
+            }
             downloadAndInstall(context.applicationContext, downloadUrl, packageName, label, listener)
         }.start()
     }
@@ -200,7 +209,7 @@ object UpdateManager {
             val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val fileName = "${packageName}-${System.currentTimeMillis()}.apk"
             val request = DownloadManager.Request(Uri.parse(downloadUrl))
-                .setTitle("Installing $label")
+                .setTitle(context.getString(R.string.status_installing_app, label))
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
             val downloadId = downloadManager.enqueue(request)
@@ -209,7 +218,9 @@ object UpdateManager {
             var status = DownloadManager.STATUS_PENDING
             val deadline = System.currentTimeMillis() + 120_000
             while (status == DownloadManager.STATUS_PENDING || status == DownloadManager.STATUS_RUNNING) {
-                if (System.currentTimeMillis() > deadline) throw IOException("Download timed out")
+                if (System.currentTimeMillis() > deadline) {
+                    throw IOException(context.getString(R.string.error_download_timed_out))
+                }
                 Thread.sleep(300)
                 downloadManager.query(query).use { cursor ->
                     status = if (cursor.moveToFirst()) {
@@ -220,15 +231,17 @@ object UpdateManager {
                 }
             }
             if (status != DownloadManager.STATUS_SUCCESSFUL) {
-                throw IOException("download failed (status $status)")
+                throw IOException(context.getString(R.string.error_download_status, status))
             }
 
             val apkUri = downloadManager.getUriForDownloadedFile(downloadId)
-                ?: throw IOException("downloaded file not found")
-            mainHandler.post { listener.onStatus("Installing $label...") }
+                ?: throw IOException(context.getString(R.string.error_downloaded_file_missing))
+            mainHandler.post {
+                listener.onStatus(context.getString(R.string.status_installing_app, label))
+            }
             installApk(context, apkUri, packageName, listener)
         } catch (e: Exception) {
-            postError(listener, "Download failed: ${e.message}")
+            postError(listener, context.getString(R.string.error_download_failed, e.message ?: ""))
         }
     }
 
@@ -241,7 +254,7 @@ object UpdateManager {
 
             session.use { s ->
                 context.contentResolver.openInputStream(apkUri).use { input ->
-                    requireNotNull(input) { "Cannot open downloaded APK" }
+                    requireNotNull(input) { context.getString(R.string.error_cannot_open_apk) }
                     s.openWrite("update", 0, -1).use { out ->
                         input.copyTo(out)
                         s.fsync(out)
@@ -257,7 +270,7 @@ object UpdateManager {
                 s.commit(pendingIntent.intentSender)
             }
         } catch (e: Exception) {
-            postError(listener, "Install failed: ${e.message}")
+            postError(listener, context.getString(R.string.error_install_failed, e.message ?: ""))
         }
     }
 
@@ -284,7 +297,7 @@ object UpdateManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 NOTIF_CHANNEL_ID,
-                "App updates",
+                context.getString(R.string.update_channel_name),
                 NotificationManager.IMPORTANCE_HIGH
             )
             notificationManager.createNotificationChannel(channel)
@@ -301,8 +314,8 @@ object UpdateManager {
 
         val notification = NotificationCompat.Builder(context, NOTIF_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("Finish installing update")
-            .setContentText("The old app was removed. Tap here to install the new version.")
+            .setContentTitle(context.getString(R.string.finish_install_title))
+            .setContentText(context.getString(R.string.finish_install_text))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setOngoing(true)

@@ -1,7 +1,9 @@
 package com.ashrafnaji.store
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -37,6 +39,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         binding.refreshButton.setOnClickListener { loadCatalog() }
+        binding.contactButton.setOnClickListener {
+            startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:0782561111")))
+        }
 
         requestNotificationPermissionIfNeeded()
 
@@ -114,39 +119,38 @@ class MainActivity : AppCompatActivity() {
         val card = ItemAppCardBinding.inflate(LayoutInflater.from(this), binding.appListContainer, false)
         binding.appListContainer.addView(card.root)
 
-        card.appNameText.text = item.name
-        card.appDeveloperText.text = "by ${BuildConfig.GITHUB_OWNER}"
+        card.appNameText.text = if (item.type == "self") getString(R.string.app_name) else item.name
+        card.appDeveloperText.text = getString(R.string.developer_by, getString(R.string.developer_name))
         bindAppIcon(item, card)
 
         if (item.type == "self") {
-            // Store's own description isn't in catalog.json -- it's fetched from the GitHub
-            // repo, so "Loading..." is a real transient state here.
-            card.appDescriptionText.text = item.description ?: "Loading..."
-            card.versionText.text = "Installed version ${BuildConfig.VERSION_NAME}"
-            UpdateManager.fetchRepoDescription { description ->
-                card.appDescriptionText.text = description ?: "No description available."
-            }
+            card.appDescriptionText.text = getString(R.string.store_description)
+            card.versionText.text = getString(R.string.installed_version, BuildConfig.VERSION_NAME)
             card.actionButton.setOnClickListener { checkSelfUpdate(card) }
             checkSelfUpdate(card)
         } else {
             // Static catalog entries have no follow-up fetch, so show the final state immediately.
-            card.appDescriptionText.text = item.description ?: "No description available."
+            card.appDescriptionText.text = item.description ?: getString(R.string.no_description)
             val installed = installedVersion(item.packageName)
-            card.versionText.text = if (installed != null) "Installed version $installed" else "Not installed"
+            card.versionText.text = if (installed != null) {
+                getString(R.string.installed_version, installed)
+            } else {
+                getString(R.string.not_installed)
+            }
 
             val hasUpdate = installed != null && item.version != null && UpdateManager.isNewer(item.version, installed)
             when {
                 installed == null -> {
                     card.statusText.text = ""
-                    card.actionButton.text = "Install"
+                    card.actionButton.setText(R.string.install)
                 }
                 hasUpdate -> {
-                    card.statusText.text = "Update available: ${item.version}"
-                    card.actionButton.text = "Update"
+                    card.statusText.text = getString(R.string.update_available, item.version)
+                    card.actionButton.setText(R.string.update)
                 }
                 else -> {
-                    card.statusText.text = "Up to date"
-                    card.actionButton.text = "Installed"
+                    card.statusText.setText(R.string.up_to_date)
+                    card.actionButton.setText(R.string.installed)
                 }
             }
 
@@ -162,7 +166,7 @@ class MainActivity : AppCompatActivity() {
             card.actionButton.setOnClickListener {
                 val url = item.resolveDownloadUrl()
                 if (url == null) {
-                    card.statusText.text = "No APK available for this device's CPU"
+                    card.statusText.setText(R.string.no_apk_for_cpu)
                     return@setOnClickListener
                 }
                 card.actionButton.isEnabled = false
@@ -172,14 +176,14 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     override fun onUpToDate() {
-                        card.statusText.text = "Up to date"
-                        card.actionButton.text = "Installed"
+                        card.statusText.setText(R.string.up_to_date)
+                        card.actionButton.setText(R.string.installed)
                         card.actionButton.isEnabled = true
                     }
 
                     override fun onError(message: String) {
-                        card.statusText.text = "Failed: $message"
-                        card.actionButton.text = "Retry"
+                        card.statusText.text = getString(R.string.failed_message, message)
+                        card.actionButton.setText(R.string.retry)
                         card.actionButton.isEnabled = true
                     }
                 })
@@ -207,21 +211,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkSelfUpdate(card: ItemAppCardBinding) {
         card.actionButton.isEnabled = false
-        card.statusText.text = "Checking for updates..."
+        card.statusText.setText(R.string.checking_updates)
         UpdateManager.checkAndUpdate(this, object : UpdateManager.Listener {
             override fun onStatus(message: String) {
                 card.statusText.text = message
             }
 
             override fun onUpToDate() {
-                card.statusText.text = "Up to date"
-                card.actionButton.text = "Installed"
+                card.statusText.setText(R.string.up_to_date)
+                card.actionButton.setText(R.string.installed)
                 card.actionButton.isEnabled = true
             }
 
             override fun onError(message: String) {
-                card.statusText.text = "Couldn't check for updates: $message"
-                card.actionButton.text = "Retry"
+                card.statusText.text = getString(R.string.could_not_check_updates, message)
+                card.actionButton.setText(R.string.retry)
                 card.actionButton.isEnabled = true
             }
         })
