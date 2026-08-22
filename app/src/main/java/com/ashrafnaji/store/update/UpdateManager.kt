@@ -1,5 +1,6 @@
 package com.ashrafnaji.store.update
 
+import android.app.DownloadManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -8,14 +9,16 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.ashrafnaji.store.BuildConfig
 import org.json.JSONObject
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import android.widget.Toast
 
 /**
  * Downloads an APK (either this app's own latest GitHub release, or an arbitrary catalog
@@ -152,6 +155,12 @@ object UpdateManager {
      * observable symptom was the exact same "Downloading version X..." status repeating forever
      * across separate launches, while DownloadManager's own records showed every one of those
      * downloads had actually finished successfully.
+     *
+     * Still uses [DownloadManager] itself for the actual write (unlike the broadcast, that part
+     * has been reliable on every device tested -- including one whose MediaProvider throws
+     * finishing a direct MediaStore.Downloads write, ruling that out as an alternative); only
+     * the notification mechanism changes, from waiting for a broadcast to polling the download's
+     * status on this same background thread until it's done.
      */
     private fun downloadAndInstall(
         context: Context,
@@ -161,65 +170,39 @@ object UpdateManager {
         listener: Listener
     ) {
         try {
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val fileName = "${packageName}-${System.currentTimeMillis()}.apk"
-            val apkUri = downloadToPublicDownloads(context, downloadUrl, fileName)
+            val request = DownloadManager.Request(Uri.parse(downloadUrl))
+                .setTitle("Installing $label")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+            val downloadId = downloadManager.enqueue(request)
+
+            val query = DownloadManager.Query().setFilterById(downloadId)
+            var status = DownloadManager.STATUS_PENDING
+            val deadline = System.currentTimeMillis() + 120_000
+            while (status == DownloadManager.STATUS_PENDING || status == DownloadManager.STATUS_RUNNING) {
+                if (System.currentTimeMillis() > deadline) throw IOException("Download timed out")
+                Thread.sleep(300)
+                downloadManager.query(query).use { cursor ->
+                    status = if (cursor.moveToFirst()) {
+                        cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                    } else {
+                        DownloadManager.STATUS_FAILED
+                    }
+                }
+            }
+            if (status != DownloadManager.STATUS_SUCCESSFUL) {
+                throw IOException("download failed (status $status)")
+            }
+
+            val apkUri = downloadManager.getUriForDownloadedFile(downloadId)
+                ?: throw IOException("downloaded file not found")
             mainHandler.post { listener.onStatus("Installing $label...") }
             installApk(context, apkUri, packageName, listener)
         } catch (e: Exception) {
             postError(listener, "Download failed: ${e.message}")
         }
-    }
-
-    /**
-     * Downloads [downloadUrl] into the shared Downloads collection and returns a content Uri
-     * owned by the system (MediaStore on API 29+, a plain file Uri below that) -- not by this
-     * app's own FileProvider, so it (and the install-failure fallback that reuses it) keeps
-     * working even if this app is uninstalled partway through.
-     */
-    private fun downloadToPublicDownloads(context: Context, downloadUrl: String, fileName: String): Uri {
-        val resolver = context.contentResolver
-        val uri: Uri
-        val outputStream: java.io.OutputStream
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val values = android.content.ContentValues().apply {
-                put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName)
-                put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive")
-                put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
-            }
-            uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: throw java.io.IOException("Could not create download entry")
-            outputStream = resolver.openOutputStream(uri)
-                ?: throw java.io.IOException("Could not open output stream")
-        } else {
-            @Suppress("DEPRECATION")
-            val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-            val file = java.io.File(downloadsDir, fileName)
-            outputStream = java.io.FileOutputStream(file)
-            uri = Uri.fromFile(file)
-        }
-
-        val connection = URL(downloadUrl).openConnection() as HttpURLConnection
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 30_000
-        connection.instanceFollowRedirects = true
-        try {
-            if (connection.responseCode !in 200..299) {
-                throw java.io.IOException("HTTP ${connection.responseCode}")
-            }
-            connection.inputStream.use { input -> outputStream.use { output -> input.copyTo(output) } }
-        } finally {
-            connection.disconnect()
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val values = android.content.ContentValues().apply {
-                put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
-            }
-            resolver.update(uri, values, null, null)
-        }
-
-        return uri
     }
 
     private fun installApk(context: Context, apkUri: Uri, packageName: String, listener: Listener) {
