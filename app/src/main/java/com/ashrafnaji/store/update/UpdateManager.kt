@@ -36,6 +36,7 @@ object UpdateManager {
 
     interface Listener {
         fun onStatus(message: String)
+        fun onDownloadProgress(downloadedBytes: Long, totalBytes: Long)
         fun onUpToDate()
         fun onError(message: String)
     }
@@ -216,6 +217,8 @@ object UpdateManager {
 
             val query = DownloadManager.Query().setFilterById(downloadId)
             var status = DownloadManager.STATUS_PENDING
+            var lastDownloadedBytes = -1L
+            var lastTotalBytes = -2L
             val deadline = System.currentTimeMillis() + 120_000
             while (status == DownloadManager.STATUS_PENDING || status == DownloadManager.STATUS_RUNNING) {
                 if (System.currentTimeMillis() > deadline) {
@@ -224,6 +227,19 @@ object UpdateManager {
                 Thread.sleep(300)
                 downloadManager.query(query).use { cursor ->
                     status = if (cursor.moveToFirst()) {
+                        val downloadedBytes = cursor.getLong(
+                            cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                        )
+                        val totalBytes = cursor.getLong(
+                            cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                        )
+                        if (downloadedBytes != lastDownloadedBytes || totalBytes != lastTotalBytes) {
+                            lastDownloadedBytes = downloadedBytes
+                            lastTotalBytes = totalBytes
+                            mainHandler.post {
+                                listener.onDownloadProgress(downloadedBytes, totalBytes)
+                            }
+                        }
                         cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
                     } else {
                         DownloadManager.STATUS_FAILED

@@ -28,6 +28,8 @@
     <string name="status_downloading_version">Downloading version %1$s…</string>
     <string name="status_downloading_app">Downloading %1$s…</string>
     <string name="status_installing_app">Installing %1$s…</string>
+    <string name="download_progress_percent">%1$d%%</string>
+    <string name="download_progress_unknown">Downloading…</string>
     <string name="self_update_label">AutoExpert Store %1$s</string>
     <string name="error_update_check">Update check failed</string>
     <string name="error_download_timed_out">Download timed out</string>

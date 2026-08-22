@@ -28,6 +28,8 @@
     <string name="status_downloading_version">جارٍ تنزيل الإصدار %1$s…</string>
     <string name="status_downloading_app">جارٍ تنزيل %1$s…</string>
     <string name="status_installing_app">جارٍ تثبيت %1$s…</string>
+    <string name="download_progress_percent">%1$d%%</string>
+    <string name="download_progress_unknown">جارٍ التنزيل…</string>
     <string name="self_update_label">متجر أوتو إكسبرت %1$s</string>
     <string name="error_update_check">فشل التحقق من التحديث</string>
     <string name="error_download_timed_out">انتهت مهلة التنزيل</string>

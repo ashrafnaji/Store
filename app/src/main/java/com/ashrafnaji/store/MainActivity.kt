@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.GridLayout
 import androidx.activity.result.contract.ActivityResultContracts
@@ -205,7 +206,12 @@ class MainActivity : AppCompatActivity() {
                         card.statusText.text = message
                     }
 
+                    override fun onDownloadProgress(downloadedBytes: Long, totalBytes: Long) {
+                        showDownloadProgress(card, downloadedBytes, totalBytes)
+                    }
+
                     override fun onUpToDate() {
+                        hideDownloadProgress(card)
                         card.statusText.setText(R.string.up_to_date)
                         card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_success))
                         card.actionButton.setText(R.string.installed)
@@ -213,6 +219,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     override fun onError(message: String) {
+                        hideDownloadProgress(card)
                         card.statusText.text = getString(R.string.failed_message, message)
                         card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_error))
                         card.actionButton.setText(R.string.retry)
@@ -249,7 +256,12 @@ class MainActivity : AppCompatActivity() {
                 card.statusText.text = message
             }
 
+            override fun onDownloadProgress(downloadedBytes: Long, totalBytes: Long) {
+                showDownloadProgress(card, downloadedBytes, totalBytes)
+            }
+
             override fun onUpToDate() {
+                hideDownloadProgress(card)
                 card.statusText.setText(R.string.up_to_date)
                 card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_success))
                 card.actionButton.setText(R.string.installed)
@@ -257,11 +269,31 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onError(message: String) {
+                hideDownloadProgress(card)
                 card.statusText.text = getString(R.string.could_not_check_updates, message)
                 card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_error))
                 card.actionButton.setText(R.string.retry)
                 card.actionButton.isEnabled = true
             }
         })
+    }
+
+    private fun showDownloadProgress(card: ItemAppCardBinding, downloadedBytes: Long, totalBytes: Long) {
+        card.downloadProgressContainer.visibility = View.VISIBLE
+        if (totalBytes > 0L) {
+            val percent = ((downloadedBytes.toDouble() / totalBytes) * 100).toInt().coerceIn(0, 100)
+            card.downloadProgressBar.isIndeterminate = false
+            card.downloadProgressBar.progress = percent
+            card.downloadProgressText.text = getString(R.string.download_progress_percent, percent)
+        } else {
+            card.downloadProgressBar.isIndeterminate = true
+            card.downloadProgressText.setText(R.string.download_progress_unknown)
+        }
+    }
+
+    private fun hideDownloadProgress(card: ItemAppCardBinding) {
+        card.downloadProgressContainer.visibility = View.GONE
+        card.downloadProgressBar.isIndeterminate = false
+        card.downloadProgressBar.progress = 0
     }
 }

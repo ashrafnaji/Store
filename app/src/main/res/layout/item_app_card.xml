@@ -69,6 +69,40 @@
         android:textDirection="locale"
         android:textSize="15sp" />
 
+    <LinearLayout
+        android:id="@+id/downloadProgressContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:id="@+id/downloadProgressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="8dp"
+            android:layout_weight="1"
+            android:indeterminateTint="@color/brand_turquoise"
+            android:max="100"
+            android:progress="0"
+            android:progressBackgroundTint="@color/divider"
+            android:progressTint="@color/brand_turquoise" />
+
+        <TextView
+            android:id="@+id/downloadProgressText"
+            android:layout_width="64dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:gravity="end"
+            android:text="@string/download_progress_unknown"
+            android:textColor="@color/brand_turquoise"
+            android:textDirection="locale"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
