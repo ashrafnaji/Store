@@ -31,6 +31,7 @@ object UpdateManager {
     const val EXTRA_APK_URI = "com.ashrafnaji.store.EXTRA_APK_URI"
     const val EXTRA_PACKAGE_NAME = "com.ashrafnaji.store.EXTRA_PACKAGE_NAME"
     private const val NOTIF_CHANNEL_ID = "app_update"
+    private val releaseAbis = setOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 
     interface Listener {
         fun onStatus(message: String)
@@ -104,15 +105,42 @@ object UpdateManager {
         }.start()
     }
 
-    /**
-     * Returns (versionName, downloadUrlForThisAbi?) or null if the request failed.
-     *
-     * Reads `latest.json` from the repo's raw content CDN rather than calling
-     * `api.github.com/repos/.../releases/latest`: the REST API caps unauthenticated requests
-     * at 60/hour per IP, which a single shared network (e.g. several units behind one router)
-     * can burn through in minutes. raw.githubusercontent.com isn't subject to that limit.
-     */
+    /** Returns (versionName, downloadUrlForThisAbi?) or null if the request failed. */
     private fun fetchLatestRelease(): Pair<String, String?>? {
+        fetchLatestReleaseRedirect()?.let { return it }
+        return fetchLatestReleaseManifest()
+    }
+
+    /**
+     * GitHub keeps this redirect current and marks it no-cache. This avoids both the REST API's
+     * unauthenticated rate limit and the raw content CDN lag that can leave latest.json stale.
+     */
+    private fun fetchLatestReleaseRedirect(): Pair<String, String?>? {
+        val owner = BuildConfig.GITHUB_OWNER
+        val repo = BuildConfig.GITHUB_REPO
+        val conn = URL("https://github.com/$owner/$repo/releases/latest").openConnection() as HttpURLConnection
+        conn.instanceFollowRedirects = false
+        conn.connectTimeout = 15_000
+        conn.readTimeout = 15_000
+        try {
+            if (conn.responseCode !in 300..399) return null
+            val location = conn.getHeaderField("Location") ?: return null
+            val tag = Uri.parse(location).lastPathSegment?.takeIf { it.isNotBlank() } ?: return null
+            val versionName = tag.removePrefix("v")
+            if (versionName.isBlank()) return null
+
+            val abi = Build.SUPPORTED_ABIS.firstOrNull { it in releaseAbis }
+            val downloadUrl = abi?.let {
+                "https://github.com/$owner/$repo/releases/download/$tag/app-$it-release.apk"
+            }
+            return versionName to downloadUrl
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** Fallback for GitHub mirrors or networks that do not return the latest-release redirect. */
+    private fun fetchLatestReleaseManifest(): Pair<String, String?>? {
         val url = URL("https://raw.githubusercontent.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPO}/main/latest.json")
         val conn = url.openConnection() as HttpURLConnection
         conn.connectTimeout = 15_000
