@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.ViewGroup
+import android.widget.GridLayout
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -133,7 +135,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun bindCard(item: CatalogItem) {
         val card = ItemAppCardBinding.inflate(LayoutInflater.from(this), binding.appListContainer, false)
-        binding.appListContainer.addView(card.root)
+        val gap = resources.getDimensionPixelSize(R.dimen.card_gap)
+        val layoutParams = GridLayout.LayoutParams().apply {
+            width = 0
+            height = ViewGroup.LayoutParams.WRAP_CONTENT
+            columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+            setMargins(gap / 2, gap / 2, gap / 2, gap / 2)
+        }
+        binding.appListContainer.addView(card.root, layoutParams)
 
         card.appNameText.text = if (item.type == "self") getString(R.string.app_name) else item.name
         card.appDeveloperText.text = getString(R.string.developer_by, getString(R.string.developer_name))

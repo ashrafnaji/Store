@@ -1,10 +1,12 @@
 <resources>
     <string name="app_name">AutoExpert Store</string>
+    <string name="store_subtitle">Official applications and updates</string>
     <string name="store_description">Official applications and updates from AutoExpert.</string>
     <string name="developer_by">by %1$s</string>
     <string name="developer_name">AutoExpert</string>
     <string name="refresh">Refresh</string>
     <string name="contact_phone">Call 0782561111</string>
+    <string name="language_toggle">عربي | EN</string>
     <string name="uninstall">Uninstall</string>
     <string name="open">Open</string>
     <string name="install">Install</string>

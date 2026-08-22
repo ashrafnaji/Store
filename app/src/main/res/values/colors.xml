@@ -1,11 +1,20 @@
 <resources>
-    <color name="brand_turquoise">#2CC9BE</color>
-    <color name="brand_turquoise_dark">#087F78</color>
-    <color name="brand_black">#080A0A</color>
+    <color name="brand_turquoise">#27C2C9</color>
+    <color name="brand_turquoise_dark">#168D93</color>
+    <color name="brand_black">#080C0F</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="status_success">#2CC9BE</color>
+    <color name="page_background">#0B1115</color>
+    <color name="header_background">#080D11</color>
+    <color name="card_background">#151C21</color>
+    <color name="control_background">#12191E</color>
+    <color name="icon_background">#0D1317</color>
+    <color name="text_primary">#F5F7F8</color>
+    <color name="text_secondary">#A4ADB3</color>
+    <color name="divider">#344047</color>
+    <color name="status_success">#27C2C9</color>
     <color name="status_warning">#F2A93B</color>
     <color name="status_error">#E3543D</color>
-    <color name="card_border">#22FFFFFF</color>
+    <color name="danger_background">#442420</color>
+    <color name="card_border">#3A444A</color>
 </resources>

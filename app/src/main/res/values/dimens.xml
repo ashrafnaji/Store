@@ -1,0 +1,4 @@
+<resources>
+    <dimen name="catalog_padding">22dp</dimen>
+    <dimen name="card_gap">14dp</dimen>
+</resources>

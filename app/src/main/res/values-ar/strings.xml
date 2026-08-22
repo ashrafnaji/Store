@@ -1,10 +1,12 @@
 <resources>
     <string name="app_name">متجر أوتو إكسبرت</string>
+    <string name="store_subtitle">التطبيقات والتحديثات الرسمية</string>
     <string name="store_description">التطبيقات والتحديثات الرسمية من أوتو إكسبرت.</string>
     <string name="developer_by">بواسطة %1$s</string>
     <string name="developer_name">أوتو إكسبرت</string>
     <string name="refresh">تحديث</string>
     <string name="contact_phone">اتصال 0782561111</string>
+    <string name="language_toggle">عربي | EN</string>
     <string name="uninstall">إلغاء التثبيت</string>
     <string name="open">فتح</string>
     <string name="install">تثبيت</string>
