@@ -87,7 +87,24 @@ def extract_apk_icon(apk_path: str):
         return None
 
     manifest = run_android_tool([aapt, "dump", "xmltree", apk_path, "AndroidManifest.xml"])
-    icon_ids = re.findall(r"android:(?:icon|roundIcon).*?=@(0x[0-9a-fA-F]+)", manifest)
+    application_attributes = []
+    manifest_lines = manifest.splitlines()
+    for index, line in enumerate(manifest_lines):
+        application_match = re.match(r"^(\s*)E: application(?:\s|$)", line)
+        if not application_match:
+            continue
+        attribute_prefix = application_match.group(1) + "  A:"
+        for attribute_line in manifest_lines[index + 1:]:
+            if attribute_line.startswith(attribute_prefix):
+                application_attributes.append(attribute_line)
+                continue
+            if attribute_line.lstrip().startswith("E:"):
+                break
+        break
+    icon_ids = re.findall(
+        r"android:(?:icon|roundIcon).*?=@(0x[0-9a-fA-F]+)",
+        "\n".join(application_attributes),
+    )
     resources = run_android_tool([aapt2, "dump", "resources", apk_path])
 
     resource_files = {}

@@ -12,7 +12,8 @@
     "type": "static",
     "version": "5.32",
     "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/v1.0.1/key.apk",
-    "description": "A simple, small, customizable on-screen keyboard."
+    "description": "A simple, small, customizable on-screen keyboard.",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/v1.0.1/key-icon.png"
   },
   {
     "id": "app-manager",
@@ -21,7 +22,8 @@
     "type": "static",
     "version": "4.0.5",
     "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/app-manager-v4.0.5/app-manager.apk",
-    "description": "Open-source app manager: browse, backup, and control installed apps and their permissions/components."
+    "description": "Open-source app manager: browse, backup, and control installed apps and their permissions/components.",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/app-manager-v4.0.5/app-manager-icon.png"
   },
   {
     "id": "morelocale-2",
@@ -33,7 +35,8 @@
     "downloadUrls": {
       "x86_64": "https://github.com/ashrafnaji/Store/releases/download/morelocale-2-v2.4.7/morelocale-2-x86_64.apk"
     },
-    "description": ""
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/morelocale-2-v2.4.7/morelocale-2-icon.png"
   },
   {
     "id": "microg-services",
@@ -48,7 +51,8 @@
       "x86": "https://github.com/ashrafnaji/Store/releases/download/microg-services-v0.3.13.2.250932/microg-services-universal.apk",
       "x86_64": "https://github.com/ashrafnaji/Store/releases/download/microg-services-v0.3.13.2.250932/microg-services-universal.apk"
     },
-    "description": ""
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/microg-services-v0.3.13.2.250932/microg-services-icon.png"
   },
   {
     "id": "youtube-revanced",
@@ -63,6 +67,7 @@
       "x86": "https://github.com/ashrafnaji/Store/releases/download/youtube-revanced-v21.10.496/youtube-revanced-universal.apk",
       "x86_64": "https://github.com/ashrafnaji/Store/releases/download/youtube-revanced-v21.10.496/youtube-revanced-universal.apk"
     },
-    "description": ""
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/youtube-revanced-v21.10.496/youtube-revanced-icon.png"
   }
 ]
