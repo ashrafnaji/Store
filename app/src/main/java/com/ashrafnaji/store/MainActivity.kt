@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.ashrafnaji.store.catalog.CatalogFetcher
 import com.ashrafnaji.store.catalog.CatalogItem
+import com.ashrafnaji.store.catalog.AppIconLoader
 import com.ashrafnaji.store.databinding.ActivityMainBinding
 import com.ashrafnaji.store.databinding.ItemAppCardBinding
 import com.ashrafnaji.store.update.PackageUninstaller
@@ -86,7 +87,8 @@ class MainActivity : AppCompatActivity() {
                 bindCard(CatalogItem(
                     id = "store", name = getString(R.string.app_name),
                     packageName = BuildConfig.APPLICATION_ID, type = "self",
-                    version = null, downloadUrl = null, downloadUrls = emptyMap(), description = null
+                    version = null, downloadUrl = null, downloadUrls = emptyMap(),
+                    description = null, iconUrl = null
                 ))
                 return@fetch
             }
@@ -114,6 +116,7 @@ class MainActivity : AppCompatActivity() {
 
         card.appNameText.text = item.name
         card.appDeveloperText.text = "by ${BuildConfig.GITHUB_OWNER}"
+        bindAppIcon(item, card)
 
         if (item.type == "self") {
             // Store's own description isn't in catalog.json -- it's fetched from the GitHub
@@ -180,6 +183,24 @@ class MainActivity : AppCompatActivity() {
                         card.actionButton.isEnabled = true
                     }
                 })
+            }
+        }
+    }
+
+    private fun bindAppIcon(item: CatalogItem, card: ItemAppCardBinding) {
+        card.appIcon.setImageResource(R.mipmap.ic_launcher)
+        if (item.type == "self") return
+
+        try {
+            card.appIcon.setImageDrawable(packageManager.getApplicationIcon(item.packageName))
+            return
+        } catch (_: PackageManager.NameNotFoundException) {
+            // Uninstalled apps use the icon extracted and published by the admin panel.
+        }
+
+        item.iconUrl?.let { url ->
+            AppIconLoader.load(url) { bitmap ->
+                if (bitmap != null) card.appIcon.setImageBitmap(bitmap)
             }
         }
     }

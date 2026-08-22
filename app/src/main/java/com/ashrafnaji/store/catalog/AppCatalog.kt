@@ -25,7 +25,8 @@ data class CatalogItem(
     val version: String?,
     val downloadUrl: String?,
     val downloadUrls: Map<String, String>,
-    val description: String?
+    val description: String?,
+    val iconUrl: String?
 ) {
     /**
      * Picks the download URL for this device's ABI, or null if this app has no build for it.
@@ -95,7 +96,8 @@ object CatalogFetcher {
                 version = o.optString("version").ifBlank { null },
                 downloadUrl = o.optString("downloadUrl").ifBlank { null },
                 downloadUrls = urls,
-                description = o.optString("description").ifBlank { null }
+                description = o.optString("description").ifBlank { null },
+                iconUrl = o.optString("iconUrl").ifBlank { null }
             )
         }
     }
