@@ -9,7 +9,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
+import androidx.core.os.LocaleListCompat
 import com.ashrafnaji.store.catalog.CatalogFetcher
 import com.ashrafnaji.store.catalog.CatalogItem
 import com.ashrafnaji.store.catalog.AppIconLoader
@@ -42,6 +44,7 @@ class MainActivity : AppCompatActivity() {
         binding.contactButton.setOnClickListener {
             startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:0782561111")))
         }
+        binding.languageButton.setOnClickListener { toggleLanguage() }
 
         requestNotificationPermissionIfNeeded()
 
@@ -70,6 +73,19 @@ class MainActivity : AppCompatActivity() {
         } else {
             loadCatalog()
         }
+    }
+
+    /**
+     * Switches the app's own display language regardless of the device's system locale.
+     * AppCompatDelegate persists the choice (via its own prefs on API < 33, via the OS's
+     * per-app language setting on 33+) and recreates the activity so every string resource
+     * re-resolves from the matching values-<lang>/ folder immediately.
+     */
+    private fun toggleLanguage() {
+        val current = AppCompatDelegate.getApplicationLocales()
+        val currentLanguage = if (!current.isEmpty) current[0]?.language else resources.configuration.locales[0].language
+        val next = if (currentLanguage == "ar") "en" else "ar"
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(next))
     }
 
     private fun requestNotificationPermissionIfNeeded() {
@@ -130,6 +146,7 @@ class MainActivity : AppCompatActivity() {
             checkSelfUpdate(card)
         } else {
             // Static catalog entries have no follow-up fetch, so show the final state immediately.
+            val defaultStatusColor = card.statusText.currentTextColor
             card.appDescriptionText.text = item.description ?: getString(R.string.no_description)
             val installed = installedVersion(item.packageName)
             card.versionText.text = if (installed != null) {
@@ -146,10 +163,12 @@ class MainActivity : AppCompatActivity() {
                 }
                 hasUpdate -> {
                     card.statusText.text = getString(R.string.update_available, item.version)
+                    card.statusText.setTextColor(ContextCompat.getColor(this, R.color.status_warning))
                     card.actionButton.setText(R.string.update)
                 }
                 else -> {
                     card.statusText.setText(R.string.up_to_date)
+                    card.statusText.setTextColor(ContextCompat.getColor(this, R.color.status_success))
                     card.actionButton.setText(R.string.installed)
                 }
             }
@@ -167,9 +186,11 @@ class MainActivity : AppCompatActivity() {
                 val url = item.resolveDownloadUrl()
                 if (url == null) {
                     card.statusText.setText(R.string.no_apk_for_cpu)
+                    card.statusText.setTextColor(ContextCompat.getColor(this, R.color.status_error))
                     return@setOnClickListener
                 }
                 card.actionButton.isEnabled = false
+                card.statusText.setTextColor(defaultStatusColor)
                 UpdateManager.installFromUrl(this, url, item.packageName, item.name, object : UpdateManager.Listener {
                     override fun onStatus(message: String) {
                         card.statusText.text = message
@@ -177,12 +198,14 @@ class MainActivity : AppCompatActivity() {
 
                     override fun onUpToDate() {
                         card.statusText.setText(R.string.up_to_date)
+                        card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_success))
                         card.actionButton.setText(R.string.installed)
                         card.actionButton.isEnabled = true
                     }
 
                     override fun onError(message: String) {
                         card.statusText.text = getString(R.string.failed_message, message)
+                        card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_error))
                         card.actionButton.setText(R.string.retry)
                         card.actionButton.isEnabled = true
                     }
@@ -219,12 +242,14 @@ class MainActivity : AppCompatActivity() {
 
             override fun onUpToDate() {
                 card.statusText.setText(R.string.up_to_date)
+                card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_success))
                 card.actionButton.setText(R.string.installed)
                 card.actionButton.isEnabled = true
             }
 
             override fun onError(message: String) {
                 card.statusText.text = getString(R.string.could_not_check_updates, message)
+                card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_error))
                 card.actionButton.setText(R.string.retry)
                 card.actionButton.isEnabled = true
             }

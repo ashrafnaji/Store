@@ -55,6 +55,15 @@
                 android:text="@string/refresh"
                 android:textColor="@color/brand_black" />
 
+            <Button
+                android:id="@+id/languageButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:backgroundTint="@color/brand_black"
+                android:text="EN / عربي"
+                android:textColor="@color/brand_turquoise" />
+
         </LinearLayout>
 
     </LinearLayout>

@@ -4,4 +4,8 @@
     <color name="brand_black">#080A0A</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="status_success">#2CC9BE</color>
+    <color name="status_warning">#F2A93B</color>
+    <color name="status_error">#E3543D</color>
+    <color name="card_border">#22FFFFFF</color>
 </resources>
