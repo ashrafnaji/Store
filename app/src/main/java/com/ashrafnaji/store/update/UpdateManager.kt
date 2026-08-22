@@ -12,7 +12,6 @@ import android.os.Build
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.ashrafnaji.store.BuildConfig
 import org.json.JSONObject
@@ -248,14 +247,7 @@ object UpdateManager {
 
         postFinishInstallNotification(context, apkUri)
 
-        val uninstallIntent = Intent(Intent.ACTION_DELETE).apply {
-            // Use Uri.fromParts to construct a proper package URI for uninstall
-            data = Uri.fromParts("package", packageName, null)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        // Inform the user that uninstall is being initiated
-        Toast.makeText(context, "Uninstalling $packageName", Toast.LENGTH_SHORT).show()
-        context.startActivity(uninstallIntent)
+        PackageUninstaller.request(context, packageName, packageName)
     }
 
     private fun postFinishInstallNotification(context: Context, apkUri: Uri) {
