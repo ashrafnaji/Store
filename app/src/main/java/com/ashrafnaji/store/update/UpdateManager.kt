@@ -1,11 +1,12 @@
 package com.ashrafnaji.store.update
 
-import android.app.DownloadManager
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
@@ -13,9 +14,12 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
+import androidx.core.content.FileProvider
 import com.ashrafnaji.store.BuildConfig
 import com.ashrafnaji.store.R
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -32,6 +36,7 @@ object UpdateManager {
     const val EXTRA_APK_URI = "com.ashrafnaji.store.EXTRA_APK_URI"
     const val EXTRA_PACKAGE_NAME = "com.ashrafnaji.store.EXTRA_PACKAGE_NAME"
     private const val NOTIF_CHANNEL_ID = "app_update"
+    private const val DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000L
     private val releaseAbis = setOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 
     interface Listener {
@@ -181,24 +186,7 @@ object UpdateManager {
         return false
     }
 
-    /**
-     * Downloads synchronously on the calling (background) thread and installs immediately
-     * after, instead of handing the download off to [DownloadManager] and waiting for its
-     * `ACTION_DOWNLOAD_COMPLETE` broadcast. That broadcast goes to a receiver registered with
-     * [Context.registerReceiver], which is tied to this process's lifetime -- on a device that
-     * kills backgrounded apps aggressively (common on infotainment units running many
-     * concurrent apps), the process can die while the download is still in progress, the
-     * receiver is lost with it, and the download completes with nothing left to act on it. The
-     * observable symptom was the exact same "Downloading version X..." status repeating forever
-     * across separate launches, while DownloadManager's own records showed every one of those
-     * downloads had actually finished successfully.
-     *
-     * Still uses [DownloadManager] itself for the actual write (unlike the broadcast, that part
-     * has been reliable on every device tested -- including one whose MediaProvider throws
-     * finishing a direct MediaStore.Downloads write, ruling that out as an alternative); only
-     * the notification mechanism changes, from waiting for a broadcast to polling the download's
-     * status on this same background thread until it's done.
-     */
+    /** Downloads without Android's DownloadProvider, which is broken on some vendor Android 9 ROMs. */
     private fun downloadAndInstall(
         context: Context,
         downloadUrl: String,
@@ -206,65 +194,112 @@ object UpdateManager {
         label: String,
         listener: Listener
     ) {
+        var downloadedFile: File? = null
         try {
-            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            val fileName = "${packageName}-${System.currentTimeMillis()}.apk"
-            val request = DownloadManager.Request(Uri.parse(downloadUrl))
-                .setTitle(context.getString(R.string.status_installing_app, label))
-                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-            val downloadId = downloadManager.enqueue(request)
-
-            val query = DownloadManager.Query().setFilterById(downloadId)
-            var status = DownloadManager.STATUS_PENDING
-            var reason = 0
-            var lastDownloadedBytes = -1L
-            var lastTotalBytes = -2L
-            val deadline = System.currentTimeMillis() + 120_000
-            while (status == DownloadManager.STATUS_PENDING || status == DownloadManager.STATUS_RUNNING) {
-                if (System.currentTimeMillis() > deadline) {
-                    throw IOException(context.getString(R.string.error_download_timed_out))
-                }
-                Thread.sleep(300)
-                downloadManager.query(query).use { cursor ->
-                    status = if (cursor.moveToFirst()) {
-                        val downloadedBytes = cursor.getLong(
-                            cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-                        )
-                        val totalBytes = cursor.getLong(
-                            cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                        )
-                        if (downloadedBytes != lastDownloadedBytes || totalBytes != lastTotalBytes) {
-                            lastDownloadedBytes = downloadedBytes
-                            lastTotalBytes = totalBytes
-                            mainHandler.post {
-                                listener.onDownloadProgress(downloadedBytes, totalBytes)
-                            }
-                        }
-                        // COLUMN_REASON holds an ERROR_* / PAUSED_* code that explains *why*
-                        // (insufficient storage, HTTP error, blocked by device policy, etc.) --
-                        // COLUMN_STATUS alone is always just 16 (STATUS_FAILED) and useless for
-                        // diagnosing which failure actually happened on a given device.
-                        reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
-                        cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                    } else {
-                        DownloadManager.STATUS_FAILED
-                    }
-                }
-            }
-            if (status != DownloadManager.STATUS_SUCCESSFUL) {
-                throw IOException(context.getString(R.string.error_download_status, status, reason))
-            }
-
-            val apkUri = downloadManager.getUriForDownloadedFile(downloadId)
-                ?: throw IOException(context.getString(R.string.error_downloaded_file_missing))
+            downloadedFile = downloadApk(context, downloadUrl, packageName, listener)
+            val apkUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.files",
+                downloadedFile
+            )
             mainHandler.post {
                 listener.onStatus(context.getString(R.string.status_installing_app, label))
             }
             installApk(context, apkUri, packageName, listener)
         } catch (e: Exception) {
+            downloadedFile?.delete()
             postError(listener, context.getString(R.string.error_download_failed, e.message ?: ""))
         }
+    }
+
+    private fun downloadApk(
+        context: Context,
+        downloadUrl: String,
+        packageName: String,
+        listener: Listener
+    ): File {
+        val canUsePublicDownloads = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+            PackageManager.PERMISSION_GRANTED
+        val directory = if (canUsePublicDownloads) {
+            @Suppress("DEPRECATION")
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        } else {
+            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                ?: File(context.cacheDir, "updates")
+        }
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw IOException(context.getString(R.string.error_download_directory))
+        }
+
+        val destination = File(directory, "${packageName}-${System.currentTimeMillis()}.apk")
+        val partial = File(directory, "${destination.name}.part")
+        val connection = URL(downloadUrl).openConnection() as HttpURLConnection
+        connection.instanceFollowRedirects = true
+        connection.connectTimeout = 15_000
+        connection.readTimeout = 30_000
+        connection.setRequestProperty("Accept", "application/vnd.android.package-archive")
+        connection.setRequestProperty("User-Agent", "AutoExpert-Store/${BuildConfig.VERSION_NAME}")
+
+        try {
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) {
+                throw IOException(context.getString(R.string.error_http_status, responseCode))
+            }
+
+            val totalBytes = connection.contentLengthLong.takeIf { it > 0L } ?: -1L
+            var downloadedBytes = 0L
+            var lastReportedAt = 0L
+            var lastPercent = -1
+            val startedAt = System.currentTimeMillis()
+            postProgress(listener, downloadedBytes, totalBytes)
+
+            connection.inputStream.use { input ->
+                FileOutputStream(partial).use { output ->
+                    val buffer = ByteArray(32 * 1024)
+                    while (true) {
+                        if (System.currentTimeMillis() - startedAt > DOWNLOAD_TIMEOUT_MS) {
+                            throw IOException(context.getString(R.string.error_download_timed_out))
+                        }
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                        downloadedBytes += count
+
+                        val now = System.currentTimeMillis()
+                        val percent = if (totalBytes > 0L) {
+                            ((downloadedBytes.toDouble() / totalBytes) * 100).toInt().coerceIn(0, 100)
+                        } else {
+                            -1
+                        }
+                        if (percent != lastPercent || now - lastReportedAt >= 250L) {
+                            lastPercent = percent
+                            lastReportedAt = now
+                            postProgress(listener, downloadedBytes, totalBytes)
+                        }
+                    }
+                    output.fd.sync()
+                }
+            }
+
+            if (totalBytes > 0L && downloadedBytes != totalBytes) {
+                throw IOException(context.getString(R.string.error_incomplete_download))
+            }
+            if (!partial.renameTo(destination)) {
+                throw IOException(context.getString(R.string.error_downloaded_file_missing))
+            }
+            postProgress(listener, downloadedBytes, if (totalBytes > 0L) totalBytes else downloadedBytes)
+            return destination
+        } catch (e: Exception) {
+            partial.delete()
+            throw e
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun postProgress(listener: Listener, downloadedBytes: Long, totalBytes: Long) {
+        mainHandler.post { listener.onDownloadProgress(downloadedBytes, totalBytes) }
     }
 
     private fun installApk(context: Context, apkUri: Uri, packageName: String, listener: Listener) {
