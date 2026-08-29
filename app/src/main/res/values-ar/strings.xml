@@ -33,7 +33,7 @@
     <string name="self_update_label">متجر أوتو إكسبرت %1$s</string>
     <string name="error_update_check">فشل التحقق من التحديث</string>
     <string name="error_download_timed_out">انتهت مهلة التنزيل</string>
-    <string name="error_download_status">فشل التنزيل (الحالة %1$d)</string>
+    <string name="error_download_status">فشل التنزيل (الحالة %1$d، السبب %2$d)</string>
     <string name="error_downloaded_file_missing">لم يتم العثور على الملف المنزّل</string>
     <string name="error_download_failed">فشل التنزيل: %1$s</string>
     <string name="error_cannot_open_apk">تعذر فتح ملف APK المنزّل</string>

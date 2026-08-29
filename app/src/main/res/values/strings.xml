@@ -33,7 +33,7 @@
     <string name="self_update_label">AutoExpert Store %1$s</string>
     <string name="error_update_check">Update check failed</string>
     <string name="error_download_timed_out">Download timed out</string>
-    <string name="error_download_status">Download failed (status %1$d)</string>
+    <string name="error_download_status">Download failed (status %1$d, reason %2$d)</string>
     <string name="error_downloaded_file_missing">Downloaded file not found</string>
     <string name="error_download_failed">Download failed: %1$s</string>
     <string name="error_cannot_open_apk">Cannot open downloaded APK</string>

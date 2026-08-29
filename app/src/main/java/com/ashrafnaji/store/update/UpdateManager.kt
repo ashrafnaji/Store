@@ -217,6 +217,7 @@ object UpdateManager {
 
             val query = DownloadManager.Query().setFilterById(downloadId)
             var status = DownloadManager.STATUS_PENDING
+            var reason = 0
             var lastDownloadedBytes = -1L
             var lastTotalBytes = -2L
             val deadline = System.currentTimeMillis() + 120_000
@@ -240,6 +241,11 @@ object UpdateManager {
                                 listener.onDownloadProgress(downloadedBytes, totalBytes)
                             }
                         }
+                        // COLUMN_REASON holds an ERROR_* / PAUSED_* code that explains *why*
+                        // (insufficient storage, HTTP error, blocked by device policy, etc.) --
+                        // COLUMN_STATUS alone is always just 16 (STATUS_FAILED) and useless for
+                        // diagnosing which failure actually happened on a given device.
+                        reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
                         cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
                     } else {
                         DownloadManager.STATUS_FAILED
@@ -247,7 +253,7 @@ object UpdateManager {
                 }
             }
             if (status != DownloadManager.STATUS_SUCCESSFUL) {
-                throw IOException(context.getString(R.string.error_download_status, status))
+                throw IOException(context.getString(R.string.error_download_status, status, reason))
             }
 
             val apkUri = downloadManager.getUriForDownloadedFile(downloadId)
