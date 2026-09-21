@@ -69,5 +69,19 @@
     },
     "description": "",
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/youtube-revanced-v21.10.496/youtube-revanced-icon.png"
+  },
+  {
+    "id": "youtube-premium",
+    "name": "YouTube Premium",
+    "packageName": "com.android.youtube.premium",
+    "type": "static",
+    "version": "21.38.123",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/youtube-premium-v21.38.123/youtube-premium-universal.apk",
+    "downloadUrls": {
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/youtube-premium-v21.38.123/youtube-premium-universal.apk",
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/youtube-premium-v21.38.123/youtube-premium-universal.apk"
+    },
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/youtube-premium-v21.38.123/youtube-premium-icon.png"
   }
 ]
