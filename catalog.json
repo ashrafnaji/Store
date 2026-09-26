@@ -163,5 +163,18 @@
     },
     "description": "",
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/vradio-v2.8.10/vradio-icon.png"
+  },
+  {
+    "id": "gboard",
+    "name": "Gboard",
+    "packageName": "com.google.android.inputmethod.latin",
+    "type": "static",
+    "version": "12.9.17.521739039-beta-armeabi-v7a",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/gboard-v12.9.17.521739039-beta-armeabi-v7a/gboard-armeabi-v7a.apk",
+    "downloadUrls": {
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/gboard-v12.9.17.521739039-beta-armeabi-v7a/gboard-armeabi-v7a.apk"
+    },
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/gboard-v12.9.17.521739039-beta-armeabi-v7a/gboard-icon.webp"
   }
 ]
