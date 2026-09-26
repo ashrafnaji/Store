@@ -176,5 +176,21 @@
     },
     "description": "",
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/gboard-v12.9.17.521739039-beta-armeabi-v7a/gboard-icon.webp"
+  },
+  {
+    "id": "floating-button",
+    "name": "Floating button",
+    "packageName": "com.simi.floatingbutton",
+    "type": "static",
+    "version": "6.3",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/floating-button-v6.3/floating-button-universal.apk",
+    "downloadUrls": {
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/floating-button-v6.3/floating-button-universal.apk",
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/floating-button-v6.3/floating-button-universal.apk",
+      "x86": "https://github.com/ashrafnaji/Store/releases/download/floating-button-v6.3/floating-button-universal.apk",
+      "x86_64": "https://github.com/ashrafnaji/Store/releases/download/floating-button-v6.3/floating-button-universal.apk"
+    },
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/floating-button-v6.3/floating-button-icon.png"
   }
 ]
