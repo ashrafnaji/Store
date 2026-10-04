@@ -224,5 +224,18 @@
     },
     "description": "",
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/firefox-v132.0/firefox-icon.webp"
+  },
+  {
+    "id": "here-wego",
+    "name": "HERE WeGo",
+    "packageName": "com.here.app.maps",
+    "type": "static",
+    "version": "4.21.200",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/here-wego-v4.21.200/here-wego-arm64-v8a.apk",
+    "downloadUrls": {
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/here-wego-v4.21.200/here-wego-arm64-v8a.apk"
+    },
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/here-wego-v4.21.200/here-wego-icon.png"
   }
 ]
