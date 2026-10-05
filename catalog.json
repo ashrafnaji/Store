@@ -253,5 +253,21 @@
     },
     "description": "",
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/diauto-v0.3.11/diauto-icon.webp"
+  },
+  {
+    "id": "diplay",
+    "name": "DiPlay",
+    "packageName": "com.shihab.diplay",
+    "type": "static",
+    "version": "0.2.12",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/diplay-v0.2.12/diplay-universal.apk",
+    "downloadUrls": {
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/diplay-v0.2.12/diplay-universal.apk",
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/diplay-v0.2.12/diplay-universal.apk",
+      "x86": "https://github.com/ashrafnaji/Store/releases/download/diplay-v0.2.12/diplay-universal.apk",
+      "x86_64": "https://github.com/ashrafnaji/Store/releases/download/diplay-v0.2.12/diplay-universal.apk"
+    },
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/diplay-v0.2.12/diplay-icon.png"
   }
 ]
