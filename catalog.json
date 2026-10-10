@@ -269,5 +269,19 @@
     },
     "description": "",
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/diplay-v0.2.12/diplay-icon.png"
+  },
+  {
+    "id": "button-master-premium",
+    "name": "Button Master Premium",
+    "packageName": "com.mozapps.buttonmasterpaid",
+    "type": "static",
+    "version": "4.2",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/button-master-premium-v4.2/button-master-premium-arm64-v8a-armeabi-v7a.apk",
+    "downloadUrls": {
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/button-master-premium-v4.2/button-master-premium-arm64-v8a-armeabi-v7a.apk",
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/button-master-premium-v4.2/button-master-premium-arm64-v8a-armeabi-v7a.apk"
+    },
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/button-master-premium-v4.2/button-master-premium-icon.webp"
   }
 ]
