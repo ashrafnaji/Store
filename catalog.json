@@ -87,22 +87,6 @@
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/carauto-v2025111215/carauto-icon.png"
   },
   {
-    "id": "maps",
-    "name": "Maps",
-    "packageName": "com.google.android.apps.maps",
-    "type": "static",
-    "version": "11.106.0503",
-    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/maps-v11.106.0503/maps-universal.apk",
-    "downloadUrls": {
-      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/maps-v11.106.0503/maps-universal.apk",
-      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/maps-v11.106.0503/maps-universal.apk",
-      "x86": "https://github.com/ashrafnaji/Store/releases/download/maps-v11.106.0503/maps-universal.apk",
-      "x86_64": "https://github.com/ashrafnaji/Store/releases/download/maps-v11.106.0503/maps-universal.apk"
-    },
-    "description": "",
-    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/maps-v11.106.0503/maps-icon.png"
-  },
-  {
     "id": "yacine-tv",
     "name": "Yacine TV",
     "packageName": "ver3.ycntivi.off",
@@ -363,5 +347,21 @@
     },
     "description": "",
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/spotify-v9.0.78.1116/spotify-icon.webp"
+  },
+  {
+    "id": "maps",
+    "name": "Maps",
+    "packageName": "app.revanced.android.apps.maps",
+    "type": "static",
+    "version": "26.26.03.935742811",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/maps-v26.26.03.935742811/maps-universal.apk",
+    "downloadUrls": {
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/maps-v26.26.03.935742811/maps-universal.apk",
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/maps-v26.26.03.935742811/maps-universal.apk",
+      "x86": "https://github.com/ashrafnaji/Store/releases/download/maps-v26.26.03.935742811/maps-universal.apk",
+      "x86_64": "https://github.com/ashrafnaji/Store/releases/download/maps-v26.26.03.935742811/maps-universal.apk"
+    },
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/maps-v26.26.03.935742811/maps-icon.png"
   }
 ]
