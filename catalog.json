@@ -331,5 +331,21 @@
     },
     "description": "",
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/aya-tv-v3.17/aya-tv-icon.png"
+  },
+  {
+    "id": "netmirrortv",
+    "name": "NetMirrorTV",
+    "packageName": "app.netmirror.newtv",
+    "type": "static",
+    "version": "9.33.0",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/netmirrortv-v9.33.0/netmirrortv-universal.apk",
+    "downloadUrls": {
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/netmirrortv-v9.33.0/netmirrortv-universal.apk",
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/netmirrortv-v9.33.0/netmirrortv-universal.apk",
+      "x86": "https://github.com/ashrafnaji/Store/releases/download/netmirrortv-v9.33.0/netmirrortv-universal.apk",
+      "x86_64": "https://github.com/ashrafnaji/Store/releases/download/netmirrortv-v9.33.0/netmirrortv-universal.apk"
+    },
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/netmirrortv-v9.33.0/netmirrortv-icon.png"
   }
 ]
