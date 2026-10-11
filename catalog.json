@@ -315,5 +315,21 @@
     },
     "description": "",
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/file-manager-v2.3.6/file-manager-icon.png"
+  },
+  {
+    "id": "aya-tv",
+    "name": "AYA TV",
+    "packageName": "com.live.ayatvpro",
+    "type": "static",
+    "version": "3.17",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/aya-tv-v3.17/aya-tv-universal.apk",
+    "downloadUrls": {
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/aya-tv-v3.17/aya-tv-universal.apk",
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/aya-tv-v3.17/aya-tv-universal.apk",
+      "x86": "https://github.com/ashrafnaji/Store/releases/download/aya-tv-v3.17/aya-tv-universal.apk",
+      "x86_64": "https://github.com/ashrafnaji/Store/releases/download/aya-tv-v3.17/aya-tv-universal.apk"
+    },
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/aya-tv-v3.17/aya-tv-icon.png"
   }
 ]
