@@ -347,5 +347,21 @@
     },
     "description": "",
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/netmirrortv-v9.33.0/netmirrortv-icon.png"
+  },
+  {
+    "id": "spotify",
+    "name": "Spotify",
+    "packageName": "com.spotify.music",
+    "type": "static",
+    "version": "9.0.78.1116",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/spotify-v9.0.78.1116/spotify-universal.apk",
+    "downloadUrls": {
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/spotify-v9.0.78.1116/spotify-universal.apk",
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/spotify-v9.0.78.1116/spotify-universal.apk",
+      "x86": "https://github.com/ashrafnaji/Store/releases/download/spotify-v9.0.78.1116/spotify-universal.apk",
+      "x86_64": "https://github.com/ashrafnaji/Store/releases/download/spotify-v9.0.78.1116/spotify-universal.apk"
+    },
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/spotify-v9.0.78.1116/spotify-icon.webp"
   }
 ]
