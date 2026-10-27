@@ -399,15 +399,15 @@
     "name": "Google Maps",
     "packageName": "com.google.android.apps.maps",
     "type": "static",
-    "version": "11.106.0503-gpsfix",
-    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503-gpsfix/google-maps-universal.apk",
+    "version": "11.106.0503",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503/google-maps-universal.apk",
     "downloadUrls": {
-      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503-gpsfix/google-maps-universal.apk",
-      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503-gpsfix/google-maps-universal.apk",
-      "x86": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503-gpsfix/google-maps-universal.apk",
-      "x86_64": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503-gpsfix/google-maps-universal.apk"
+      "arm64-v8a": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503/google-maps-universal.apk",
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503/google-maps-universal.apk",
+      "x86": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503/google-maps-universal.apk",
+      "x86_64": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503/google-maps-universal.apk"
     },
     "description": "",
-    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503-gpsfix/google-maps-icon.png"
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503/google-maps-icon.png"
   }
 ]
