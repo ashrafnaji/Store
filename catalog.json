@@ -409,5 +409,18 @@
     },
     "description": "",
     "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/google-maps-v11.106.0503/google-maps-icon.png"
+  },
+  {
+    "id": "airscreen",
+    "name": "AirScreen",
+    "packageName": "com.ionitech.airscreen",
+    "type": "static",
+    "version": "2.8.1",
+    "downloadUrl": "https://github.com/ashrafnaji/Store/releases/download/airscreen-v2.8.1/airscreen-armeabi-v7a.apk",
+    "downloadUrls": {
+      "armeabi-v7a": "https://github.com/ashrafnaji/Store/releases/download/airscreen-v2.8.1/airscreen-armeabi-v7a.apk"
+    },
+    "description": "",
+    "iconUrl": "https://github.com/ashrafnaji/Store/releases/download/airscreen-v2.8.1/airscreen-icon.png"
   }
 ]
