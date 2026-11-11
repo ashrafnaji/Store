@@ -79,7 +79,7 @@ def run_android_tool(command):
     return result.stdout
 
 
-def extract_apk_icon(apk_path: str):
+def _extract_apk_icon_aapt(apk_path: str):
     """Returns the APK's best raster launcher icon bytes, extension, and resource path."""
     aapt = find_aapt()
     aapt2 = find_aapt2()
@@ -108,28 +108,42 @@ def extract_apk_icon(apk_path: str):
     resources = run_android_tool([aapt2, "dump", "resources", apk_path])
 
     resource_files = {}
+    resource_names = {}  # "mipmap/name" -> id
+    resource_aliases = {}  # id -> ["mipmap/name", ...] for entries that reference another resource
     current_id = None
     for line in resources.splitlines():
-        resource_match = re.match(r"\s*resource (0x[0-9a-fA-F]+)\s", line)
+        resource_match = re.match(r"\s*resource (0x[0-9a-fA-F]+)\s+(\S+)", line)
         if resource_match:
             current_id = resource_match.group(1).lower()
+            resource_names[resource_match.group(2)] = current_id
             continue
-        file_match = re.match(r"\s*\(([^)]*)\) \(file\) (\S+) type=(\S+)", line)
+        file_match = re.match(r"\s*\(([^)]*)\) \(file\) (\S+)", line)  # "type=..." suffix is absent in some aapt2 versions
         if current_id and file_match:
             resource_files.setdefault(current_id, []).append((file_match.group(1), file_match.group(2)))
+            continue
+        alias_match = re.match(r"\s*\([^)]*\) @(?:\+)?(?:[\w.]+:)?(\S+)", line)
+        if current_id and alias_match:
+            resource_aliases.setdefault(current_id, []).append(alias_match.group(1))
 
     density_rank = {
         "xxxhdpi": 6, "xxhdpi": 5, "xhdpi": 4, "hdpi": 3, "mdpi": 2, "ldpi": 1,
     }
 
-    def raster_candidates(resource_id):
+    def raster_candidates(resource_id, depth=0):
+        resource_id = resource_id.lower()
         candidates = []
-        for config, resource_path in resource_files.get(resource_id.lower(), []):
+        for config, resource_path in resource_files.get(resource_id, []):
             lower_path = resource_path.lower()
             if lower_path.endswith(".9.png") or not lower_path.endswith((".png", ".webp", ".jpg", ".jpeg")):
                 continue
             rank = max((score for density, score in density_rank.items() if density in config), default=0)
             candidates.append((rank, resource_path))
+        # Icons are often aliases (e.g. "() @mipmap/other_icon") -- follow them to the real files.
+        if not candidates and depth < 5:
+            for target_name in resource_aliases.get(resource_id, []):
+                target_id = resource_names.get(target_name)
+                if target_id:
+                    candidates.extend(raster_candidates(target_id, depth + 1))
         return sorted(candidates, reverse=True)
 
     # Prefer the main icon, then roundIcon. If either is adaptive-only, follow its foreground
@@ -161,7 +175,7 @@ def extract_apk_icon(apk_path: str):
     return None
 
 
-def inspect_apk(apk_path: str):
+def _inspect_apk_aapt(apk_path: str):
     """
     Reads package name, versionName, app label, and supported ABIs straight out of the APK
     using aapt (part of the Android SDK build-tools). Returns None if aapt isn't available --
@@ -202,6 +216,343 @@ def inspect_apk(apk_path: str):
         "app_label": label_match.group(1) if label_match else "",
         "abis": abis,  # empty list == no native libs == works on every architecture
     }
+
+
+# ---------------------------------------------------------------------------------------------
+# Built-in APK reader (pure Python, no Android SDK needed).
+#
+# Parses the binary AndroidManifest.xml and resources.arsc directly out of the APK zip, so
+# auto-fill and icon extraction work on any PC. aapt is only used as a fallback if this parser
+# hits something it can't handle.
+# ---------------------------------------------------------------------------------------------
+import struct
+
+_ATTR_LABEL = 0x01010001
+_ATTR_ICON = 0x01010002
+_ATTR_VERSION_CODE = 0x0101021B
+_ATTR_VERSION_NAME = 0x0101021C
+_ATTR_ROUND_ICON = 0x0101052C
+_ATTR_DRAWABLE = 0x01010199
+_ATTR_SRC = 0x01010119
+
+_TYPE_REFERENCE = 0x01
+_TYPE_STRING = 0x03
+
+_DENSITY_SCORE = {120: 1, 160: 2, 213: 2, 240: 3, 320: 4, 480: 5, 640: 6}
+
+
+def _read_string_pool(data, offset):
+    """Parses a ResStringPool chunk at `offset`; returns a list of strings."""
+    _type, header_size, _size, count, _styles, flags, strings_start, _ = struct.unpack_from("<HHIIIIII", data, offset)
+    utf8 = bool(flags & 0x100)
+    offsets = struct.unpack_from(f"<{count}I", data, offset + header_size)
+    base = offset + strings_start
+    strings = []
+    for string_offset in offsets:
+        pos = base + string_offset
+        try:
+            if utf8:
+                # char length (skip), then byte length -- each 1 or 2 bytes
+                length = data[pos]
+                pos += 2 if length & 0x80 else 1
+                byte_length = data[pos]
+                if byte_length & 0x80:
+                    byte_length = ((byte_length & 0x7F) << 8) | data[pos + 1]
+                    pos += 2
+                else:
+                    pos += 1
+                strings.append(data[pos:pos + byte_length].decode("utf-8", errors="replace"))
+            else:
+                length = struct.unpack_from("<H", data, pos)[0]
+                pos += 2
+                if length & 0x8000:
+                    length = ((length & 0x7FFF) << 16) | struct.unpack_from("<H", data, pos)[0]
+                    pos += 2
+                strings.append(data[pos:pos + length * 2].decode("utf-16-le", errors="replace"))
+        except Exception:
+            strings.append("")
+    return strings
+
+
+def _parse_axml(data):
+    """
+    Parses a compiled (binary) Android XML file. Returns a list of elements in document order:
+    [{"name": tag, "depth": n, "attrs": [(resource_id_or_0, attr_name, (data_type, data, raw_string))]}]
+    """
+    strings = []
+    resource_ids = []
+    elements = []
+    depth = 0
+    _type, header_size, total = struct.unpack_from("<HHI", data, 0)
+    pos = header_size
+    end = min(total, len(data))
+    while pos + 8 <= end:
+        chunk_type, chunk_header, chunk_size = struct.unpack_from("<HHI", data, pos)
+        if chunk_size < 8:
+            break
+        if chunk_type == 0x0001:
+            strings = _read_string_pool(data, pos)
+        elif chunk_type == 0x0180:
+            count = (chunk_size - chunk_header) // 4
+            resource_ids = list(struct.unpack_from(f"<{count}I", data, pos + chunk_header))
+        elif chunk_type == 0x0102:
+            name_index, attr_start, attr_size, attr_count = struct.unpack_from("<IHHH", data, pos + 20)
+            attr_size = attr_size or 20
+            attrs = []
+            attr_pos = pos + 16 + attr_start
+            for i in range(attr_count):
+                a = attr_pos + i * attr_size
+                _ns, a_name, a_raw, _vsize, _res0, v_type, v_data = struct.unpack_from("<IIIHBBI", data, a)
+                res_id = resource_ids[a_name] if a_name < len(resource_ids) else 0
+                name = strings[a_name] if a_name < len(strings) else ""
+                raw = strings[a_raw] if a_raw != 0xFFFFFFFF and a_raw < len(strings) else None
+                attrs.append((res_id, name, (v_type, v_data, raw)))
+            tag = strings[name_index] if name_index < len(strings) else ""
+            elements.append({"name": tag, "depth": depth, "attrs": attrs})
+            depth += 1
+        elif chunk_type == 0x0103:
+            depth -= 1
+        pos += chunk_size
+    return elements
+
+
+def _find_attr(element, resource_id, fallback_name=None):
+    for res_id, name, value in element["attrs"]:
+        if res_id == resource_id or (fallback_name and res_id == 0 and name == fallback_name):
+            return value
+    return None
+
+
+class _ResourceTable:
+    """Minimal resources.arsc reader: maps resource id -> [(config_info, data_type, data)]."""
+
+    def __init__(self, data):
+        self.entries = {}
+        self.global_strings = []
+        _type, header_size, total, _pkg_count = struct.unpack_from("<HHII", data, 0)
+        pos = header_size
+        end = min(total, len(data))
+        while pos + 8 <= end:
+            chunk_type, _chunk_header, chunk_size = struct.unpack_from("<HHI", data, pos)
+            if chunk_size < 8:
+                break
+            if chunk_type == 0x0001:
+                self.global_strings = _read_string_pool(data, pos)
+            elif chunk_type == 0x0200:
+                self._read_package(data, pos, chunk_size)
+            pos += chunk_size
+
+    def _read_package(self, data, start, size):
+        header_size = struct.unpack_from("<H", data, start + 2)[0]
+        package_id = struct.unpack_from("<I", data, start + 8)[0]
+        type_strings_offset = struct.unpack_from("<I", data, start + 268)[0]
+        self.type_names = _read_string_pool(data, start + type_strings_offset) if type_strings_offset else []
+        pos = start + header_size
+        end = start + size
+        while pos + 8 <= end:
+            chunk_type, chunk_header, chunk_size = struct.unpack_from("<HHI", data, pos)
+            if chunk_size < 8:
+                break
+            if chunk_type == 0x0201:
+                self._read_type(data, pos, chunk_header, package_id)
+            pos += chunk_size
+
+    def _read_type(self, data, start, header_size, package_id):
+        type_id, flags, _reserved, entry_count, entries_start = struct.unpack_from("<BBHII", data, start + 8)
+        config_pos = start + 20
+        config_size = struct.unpack_from("<I", data, config_pos)[0]
+        language = data[config_pos + 8:config_pos + 10].rstrip(b"\0").decode("latin-1", errors="replace")
+        density = struct.unpack_from("<H", data, config_pos + 14)[0] if config_size >= 16 else 0
+        config = {"language": language, "density": density}
+
+        index_pos = start + header_size
+        offsets = []
+        if flags & 0x01:  # FLAG_SPARSE: (u16 index, u16 offset/4)
+            for i in range(entry_count):
+                idx, off = struct.unpack_from("<HH", data, index_pos + i * 4)
+                offsets.append((idx, off * 4))
+        elif flags & 0x02:  # FLAG_OFFSET16
+            for i in range(entry_count):
+                off = struct.unpack_from("<H", data, index_pos + i * 2)[0]
+                if off != 0xFFFF:
+                    offsets.append((i, off * 4))
+        else:
+            for i in range(entry_count):
+                off = struct.unpack_from("<I", data, index_pos + i * 4)[0]
+                if off != 0xFFFFFFFF:
+                    offsets.append((i, off))
+
+        for index, off in offsets:
+            entry_pos = start + entries_start + off
+            try:
+                entry_size, entry_flags = struct.unpack_from("<HH", data, entry_pos)
+                if entry_flags & 0x0008:  # FLAG_COMPACT: data inline, type in high byte of flags
+                    v_type = entry_flags >> 8
+                    v_data = struct.unpack_from("<I", data, entry_pos + 4)[0]
+                elif entry_flags & 0x0001:  # complex (style/array) -- not needed here
+                    continue
+                else:
+                    _vsize, _res0, v_type, v_data = struct.unpack_from("<HBBI", data, entry_pos + entry_size)
+            except struct.error:
+                continue
+            resource_id = (package_id << 24) | (type_id << 16) | index
+            self.entries.setdefault(resource_id, []).append((config, v_type, v_data))
+
+    def string(self, index):
+        return self.global_strings[index] if 0 <= index < len(self.global_strings) else ""
+
+    def resolve_string(self, resource_id, depth=0):
+        values = self.entries.get(resource_id, [])
+        # Prefer the default (no-locale) value, then English, then anything.
+        ordered = sorted(values, key=lambda v: 0 if not v[0]["language"] else 1 if v[0]["language"] == "en" else 2)
+        for _config, v_type, v_data in ordered:
+            if v_type == _TYPE_STRING:
+                return self.string(v_data)
+            if v_type == _TYPE_REFERENCE and depth < 5:
+                text = self.resolve_string(v_data, depth + 1)
+                if text:
+                    return text
+        return ""
+
+    def file_paths(self, resource_id, depth=0):
+        """Returns [(density_score, path)] for a file resource, following aliases."""
+        results = []
+        for config, v_type, v_data in self.entries.get(resource_id, []):
+            if v_type == _TYPE_STRING:
+                density = config["density"]
+                score = _DENSITY_SCORE.get(density, 7 if density == 0xFFFF else 0)
+                results.append((score, self.string(v_data)))
+            elif v_type == _TYPE_REFERENCE and depth < 5:
+                results.extend(self.file_paths(v_data, depth + 1))
+        return results
+
+
+def _value_to_text(value, table):
+    if value is None:
+        return ""
+    v_type, v_data, raw = value
+    if raw is not None:
+        return raw
+    if v_type == _TYPE_REFERENCE and table:
+        return table.resolve_string(v_data)
+    if v_type in (0x10, 0x11):
+        return str(v_data)
+    return ""
+
+
+def _load_apk(apk_path):
+    with zipfile.ZipFile(apk_path) as apk:
+        manifest = _parse_axml(apk.read("AndroidManifest.xml"))
+        names = apk.namelist()
+        try:
+            table = _ResourceTable(apk.read("resources.arsc"))
+        except KeyError:
+            table = None
+    return manifest, table, names
+
+
+def inspect_apk_builtin(apk_path):
+    manifest, table, names = _load_apk(apk_path)
+    package_name = version_name = app_label = ""
+    for element in manifest:
+        if element["name"] == "manifest":
+            package_name = _value_to_text(_find_attr(element, 0, "package"), table)
+            version_name = _value_to_text(_find_attr(element, _ATTR_VERSION_NAME, "versionName"), table)
+        elif element["name"] == "application":
+            app_label = _value_to_text(_find_attr(element, _ATTR_LABEL, "label"), table)
+            break
+
+    abis = sorted({
+        name.split("/")[1] for name in names
+        if name.startswith("lib/") and name.endswith(".so") and name.count("/") >= 2
+    })
+    return {
+        "package_name": package_name,
+        "version_name": version_name,
+        "app_label": app_label,
+        "abis": abis,  # empty list == no native libs == works on every architecture
+    }
+
+
+def extract_apk_icon_builtin(apk_path):
+    manifest, table, _names = _load_apk(apk_path)
+    if table is None:
+        return None
+    icon_ids = []
+    for element in manifest:
+        if element["name"] == "application":
+            for attr_id in (_ATTR_ICON, _ATTR_ROUND_ICON):
+                value = _find_attr(element, attr_id)
+                if value and value[0] == _TYPE_REFERENCE:
+                    icon_ids.append(value[1])
+            break
+    # Fall back to the first activity icon if the <application> has none.
+    if not icon_ids:
+        for element in manifest:
+            if element["name"] in ("activity", "activity-alias"):
+                value = _find_attr(element, _ATTR_ICON)
+                if value and value[0] == _TYPE_REFERENCE:
+                    icon_ids.append(value[1])
+                    break
+
+    raster_ext = (".png", ".webp", ".jpg", ".jpeg")
+    with zipfile.ZipFile(apk_path) as apk:
+        seen = set()
+        queue = list(icon_ids)
+        while queue:
+            resource_id = queue.pop(0)
+            if resource_id in seen or len(seen) > 20:
+                continue
+            seen.add(resource_id)
+            paths = table.file_paths(resource_id)
+            rasters = sorted(
+                (p for p in paths if p[1].lower().endswith(raster_ext) and not p[1].lower().endswith(".9.png")),
+                reverse=True,
+            )
+            if rasters:
+                resource_path = rasters[0][1]
+                extension = Path(resource_path).suffix.lower().lstrip(".")
+                return {
+                    "data": apk.read(resource_path),
+                    "extension": "jpg" if extension == "jpeg" else extension,
+                    "resource_path": resource_path,
+                    "apk_path": str(Path(apk_path).resolve()),
+                }
+            # Adaptive / layer-list / bitmap XML: follow foreground first, then other drawables.
+            for _score, xml_path in paths:
+                if not xml_path.lower().endswith(".xml"):
+                    continue
+                try:
+                    elements = _parse_axml(apk.read(xml_path))
+                except Exception:
+                    continue
+                refs = []
+                for element in elements:
+                    for attr_id in (_ATTR_DRAWABLE, _ATTR_SRC):
+                        value = _find_attr(element, attr_id)
+                        if value and value[0] == _TYPE_REFERENCE:
+                            refs.append((0 if element["name"] == "foreground" else 1, value[1]))
+                queue.extend(ref for _, ref in sorted(refs))
+    return None
+
+
+def inspect_apk(apk_path: str):
+    """Reads package/version/label/ABIs. Built-in parser first; aapt only as a fallback."""
+    try:
+        return inspect_apk_builtin(apk_path)
+    except Exception:
+        return _inspect_apk_aapt(apk_path)
+
+
+def extract_apk_icon(apk_path: str):
+    """Returns the APK's best raster launcher icon. Built-in parser first; aapt as a fallback."""
+    try:
+        icon = extract_apk_icon_builtin(apk_path)
+        if icon:
+            return icon
+    except Exception:
+        pass
+    return _extract_apk_icon_aapt(apk_path)
 
 
 def load_saved_token():
@@ -288,7 +639,10 @@ def push_catalog(token, items, sha, message, log):
 
 
 def publish_app(token, app_id, name, package_name, version, description, arch_files, icon_asset, log):
-    tag = f"{app_id}-v{version}"
+    # versionName is free text (e.g. "Headunit Reloaded V7.2.1") -- keep it as-is for the catalog,
+    # which the store compares against the installed versionName, but make the tag URL-safe.
+    tag_version = re.sub(r"[^A-Za-z0-9._-]+", "-", version).strip("-.")
+    tag = f"{app_id}-v{tag_version}"
     release = get_or_create_release(token, tag, f"{name} v{version}", log)
     upload_url = release["upload_url"].split("{")[0]
 
@@ -307,7 +661,7 @@ def publish_app(token, app_id, name, package_name, version, description, arch_fi
     download_urls = {}
     for group in groups.values():
         archs = group["archs"]
-        suffix = "universal" if set(archs) == set(arch_files.keys()) else "-".join(sorted(archs))
+        suffix = "universal" if set(archs) == set(ARCHS) else "-".join(sorted(archs))
         asset_name = f"{app_id}-{suffix}.apk"
         delete_asset_if_present(token, release, asset_name, log)
         upload_asset(token, upload_url, group["path"], asset_name, log)
@@ -429,9 +783,10 @@ class AdminPanel:
         row.pack(fill=X, pady=2)
         Checkbutton(row, variable=self.arch_check_vars[arch]).pack(side=LEFT)
         Label(row, text=arch, width=13, anchor="w").pack(side=LEFT)
-        path_label = Label(row, textvariable=self.arch_vars[arch], anchor="w", fg="gray")
-        path_label.pack(side=LEFT, fill=X, expand=True)
+        # Pack the button first so a long path can't push it off the edge of the window.
         Button(row, text="Browse...", command=lambda a=arch: self.pick_file(a)).pack(side=RIGHT)
+        path_label = Label(row, textvariable=self.arch_vars[arch], anchor="w", fg="gray", width=1)
+        path_label.pack(side=LEFT, fill=X, expand=True)
 
     def pick_file(self, arch):
         path = filedialog.askopenfilename(title=f"Select APK for {arch}", filetypes=[("APK files", "*.apk")])
@@ -480,11 +835,15 @@ class AdminPanel:
         if not path:
             return
 
-        info = inspect_apk(path)
+        try:
+            info = inspect_apk(path)
+        except Exception as error:
+            self.log(f"Error reading {Path(path).name}: {error}")
+            info = None
         if info is None:
             self.log(
-                "Couldn't auto-detect: no 'aapt' found on this PC (part of the Android SDK "
-                "build-tools). Fill in the fields and pick per-architecture files manually."
+                f"Couldn't read {Path(path).name} -- it may be damaged or not a valid APK. "
+                "Fill in the fields and pick per-architecture files manually."
             )
             return
 
