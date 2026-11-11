@@ -46,4 +46,16 @@
     <string name="update_channel_name">App updates</string>
     <string name="finish_install_title">Finish installing update</string>
     <string name="finish_install_text">The old app was removed. Tap here to install the new version.</string>
+    <string name="neta_password_button">NETA install password</string>
+    <string name="neta_password_title">NETA U install password</string>
+    <string name="neta_password_vin_label">VIN</string>
+    <string name="neta_password_vin_hint">17-character VIN</string>
+    <string name="neta_password_vin_from_device">Read from this unit</string>
+    <string name="neta_password_vin_not_read">Could not read the VIN from this unit — enter it manually.</string>
+    <string name="neta_password_vin_invalid">Not a valid 17-character VIN.</string>
+    <string name="neta_password_result_label">Today\'s password</string>
+    <string name="neta_password_for_date">For %1$s</string>
+    <string name="neta_password_copy">Copy</string>
+    <string name="neta_password_copied">Password copied</string>
+    <string name="close">Close</string>
 </resources>

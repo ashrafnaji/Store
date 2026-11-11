@@ -1,6 +1,9 @@
 package com.ashrafnaji.store
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -10,18 +13,27 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.GridLayout
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
+import androidx.core.widget.doAfterTextChanged
 import com.ashrafnaji.store.catalog.CatalogFetcher
 import com.ashrafnaji.store.catalog.CatalogItem
 import com.ashrafnaji.store.catalog.AppIconLoader
 import com.ashrafnaji.store.databinding.ActivityMainBinding
+import com.ashrafnaji.store.databinding.DialogNetaPasswordBinding
 import com.ashrafnaji.store.databinding.ItemAppCardBinding
+import com.ashrafnaji.store.neta.DeviceVin
+import com.ashrafnaji.store.neta.NetaUnlockPassword
 import com.ashrafnaji.store.update.PackageUninstaller
 import com.ashrafnaji.store.update.UpdateManager
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -48,6 +60,7 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:0782561111")))
         }
         binding.languageButton.setOnClickListener { toggleLanguage() }
+        binding.netaPasswordButton.setOnClickListener { showNetaPasswordDialog() }
 
         requestNotificationPermissionIfNeeded()
 
@@ -89,6 +102,51 @@ class MainActivity : AppCompatActivity() {
         val currentLanguage = if (!current.isEmpty) current[0]?.language else resources.configuration.locales[0].language
         val next = if (currentLanguage == "ar") "en" else "ar"
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(next))
+    }
+
+    /**
+     * NETA U units sometimes prompt for a password before accepting an APK install. It's
+     * derived from the unit's VIN + today's date (see [NetaUnlockPassword]) -- read the VIN
+     * from this device directly and show the matching password, falling back to manual VIN
+     * entry if the property can't be read from inside the app.
+     */
+    private fun showNetaPasswordDialog() {
+        val dialogBinding = DialogNetaPasswordBinding.inflate(LayoutInflater.from(this))
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val today = Date()
+        dialogBinding.dateText.text = getString(R.string.neta_password_for_date, dateFormat.format(today))
+
+        fun refreshPassword(vin: String) {
+            val password = NetaUnlockPassword.compute(vin, today)
+            dialogBinding.passwordText.text = password ?: ""
+            dialogBinding.passwordText.hint =
+                if (password == null && vin.isNotEmpty()) getString(R.string.neta_password_vin_invalid) else ""
+        }
+
+        val deviceVin = DeviceVin.read()
+        dialogBinding.vinInput.setText(deviceVin ?: "")
+        dialogBinding.vinSourceText.setText(
+            if (deviceVin != null) R.string.neta_password_vin_from_device else R.string.neta_password_vin_not_read
+        )
+        refreshPassword(deviceVin ?: "")
+
+        dialogBinding.vinInput.doAfterTextChanged { text ->
+            refreshPassword(text?.toString().orEmpty())
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.neta_password_title)
+            .setView(dialogBinding.root)
+            .setPositiveButton(R.string.neta_password_copy) { _, _ ->
+                val password = dialogBinding.passwordText.text?.toString().orEmpty()
+                if (password.isNotEmpty()) {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.neta_password_title), password))
+                    Toast.makeText(this, R.string.neta_password_copied, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
     }
 
     private fun requestNotificationPermissionIfNeeded() {

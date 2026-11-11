@@ -92,6 +92,16 @@
                     android:contentDescription="@string/refresh"
                     android:padding="15dp"
                     android:src="@drawable/ic_refresh" />
+
+                <ImageButton
+                    android:id="@+id/netaPasswordButton"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/bg_control_button"
+                    android:contentDescription="@string/neta_password_button"
+                    android:padding="15dp"
+                    android:src="@drawable/ic_key" />
             </LinearLayout>
 
             <Button

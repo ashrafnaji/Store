@@ -46,4 +46,16 @@
     <string name="update_channel_name">تحديثات التطبيقات</string>
     <string name="finish_install_title">إكمال تثبيت التحديث</string>
     <string name="finish_install_text">تمت إزالة التطبيق القديم. اضغط هنا لتثبيت الإصدار الجديد.</string>
+    <string name="neta_password_button">كلمة مرور تثبيت نيتا</string>
+    <string name="neta_password_title">كلمة مرور تثبيت نيتا U</string>
+    <string name="neta_password_vin_label">رقم الهيكل (VIN)</string>
+    <string name="neta_password_vin_hint">رقم هيكل مكوّن من 17 رمزاً</string>
+    <string name="neta_password_vin_from_device">تمت قراءته من هذا الجهاز</string>
+    <string name="neta_password_vin_not_read">تعذرت قراءة رقم الهيكل من هذا الجهاز — أدخله يدوياً.</string>
+    <string name="neta_password_vin_invalid">رقم الهيكل غير صالح (يجب أن يكون 17 رمزاً).</string>
+    <string name="neta_password_result_label">كلمة مرور اليوم</string>
+    <string name="neta_password_for_date">لتاريخ %1$s</string>
+    <string name="neta_password_copy">نسخ</string>
+    <string name="neta_password_copied">تم نسخ كلمة المرور</string>
+    <string name="close">إغلاق</string>
 </resources>
