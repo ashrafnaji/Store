@@ -47,7 +47,9 @@
     <string name="finish_install_title">إكمال تثبيت التحديث</string>
     <string name="finish_install_text">تمت إزالة التطبيق القديم. اضغط هنا لتثبيت الإصدار الجديد.</string>
     <string name="neta_password_button">كلمة مرور تثبيت نيتا</string>
-    <string name="neta_password_title">كلمة مرور تثبيت نيتا U</string>
+    <string name="neta_password_title">كلمة مرور تثبيت نيتا</string>
+    <string name="neta_password_applied">تم إدخالها في الجهاز تلقائياً.</string>
+    <string name="neta_password_need_permission">للإدخال التلقائي نفّذ مرة واحدة عبر ADB:\nadb shell pm grant com.ashrafnaji.store android.permission.WRITE_SECURE_SETTINGS\nإلى ذلك الحين اكتب كلمة المرور أعلاه يدوياً.</string>
     <string name="neta_password_vin_label">رقم الهيكل (VIN)</string>
     <string name="neta_password_vin_hint">رقم هيكل مكوّن من 17 رمزاً</string>
     <string name="neta_password_vin_from_device">تمت قراءته من هذا الجهاز</string>

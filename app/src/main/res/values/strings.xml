@@ -47,7 +47,9 @@
     <string name="finish_install_title">Finish installing update</string>
     <string name="finish_install_text">The old app was removed. Tap here to install the new version.</string>
     <string name="neta_password_button">NETA install password</string>
-    <string name="neta_password_title">NETA U install password</string>
+    <string name="neta_password_title">NETA install password</string>
+    <string name="neta_password_applied">Entered into the unit automatically.</string>
+    <string name="neta_password_need_permission">To enter it automatically, run once over ADB:\nadb shell pm grant com.ashrafnaji.store android.permission.WRITE_SECURE_SETTINGS\nUntil then, type the password above by hand.</string>
     <string name="neta_password_vin_label">VIN</string>
     <string name="neta_password_vin_hint">17-character VIN</string>
     <string name="neta_password_vin_from_device">Read from this unit</string>

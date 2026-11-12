@@ -19,6 +19,11 @@
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
+    <!-- Lets the app write the NETA install password (dev_adb_auth_passwd) itself. It's only
+         grantable via `adb shell pm grant`; without it the app just shows the password. -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
 
     <application
         android:allowBackup="true"

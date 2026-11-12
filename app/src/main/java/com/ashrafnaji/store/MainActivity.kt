@@ -28,6 +28,7 @@ import com.ashrafnaji.store.databinding.ActivityMainBinding
 import com.ashrafnaji.store.databinding.DialogNetaPasswordBinding
 import com.ashrafnaji.store.databinding.ItemAppCardBinding
 import com.ashrafnaji.store.neta.DeviceVin
+import com.ashrafnaji.store.neta.NetaPasswordApplier
 import com.ashrafnaji.store.neta.NetaUnlockPassword
 import com.ashrafnaji.store.update.PackageUninstaller
 import com.ashrafnaji.store.update.UpdateManager
@@ -76,10 +77,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        UpdateManager.detachListeners()
+        super.onDestroy()
+    }
+
     private var isFirstResume = true
 
     override fun onResume() {
         super.onResume()
+        NetaPasswordApplier.applyForToday(this)
         // Installs are confirmed in a system dialog outside our process (and, for self-updates,
         // this Activity gets killed and relaunched by the system). Re-check installed versions
         // whenever the user comes back so cards don't stay stuck on "Installing...". Skip the
@@ -121,6 +128,13 @@ class MainActivity : AppCompatActivity() {
             dialogBinding.passwordText.text = password ?: ""
             dialogBinding.passwordText.hint =
                 if (password == null && vin.isNotEmpty()) getString(R.string.neta_password_vin_invalid) else ""
+            dialogBinding.applyStatusText.text = when (
+                if (password != null) NetaPasswordApplier.applyForToday(this, vin) else null
+            ) {
+                NetaPasswordApplier.Result.APPLIED -> getString(R.string.neta_password_applied)
+                NetaPasswordApplier.Result.NO_PERMISSION -> getString(R.string.neta_password_need_permission)
+                else -> ""
+            }
         }
 
         val deviceVin = DeviceVin.read()
@@ -259,32 +273,40 @@ class MainActivity : AppCompatActivity() {
                 }
                 card.actionButton.isEnabled = false
                 card.statusText.setTextColor(defaultStatusColor)
-                UpdateManager.installFromUrl(this, url, item.packageName, item.name, object : UpdateManager.Listener {
-                    override fun onStatus(message: String) {
-                        card.statusText.text = message
-                    }
-
-                    override fun onDownloadProgress(downloadedBytes: Long, totalBytes: Long) {
-                        showDownloadProgress(card, downloadedBytes, totalBytes)
-                    }
-
-                    override fun onUpToDate() {
-                        hideDownloadProgress(card)
-                        card.statusText.setText(R.string.up_to_date)
-                        card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_success))
-                        card.actionButton.setText(R.string.installed)
-                        card.actionButton.isEnabled = true
-                    }
-
-                    override fun onError(message: String) {
-                        hideDownloadProgress(card)
-                        card.statusText.text = getString(R.string.failed_message, message)
-                        card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_error))
-                        card.actionButton.setText(R.string.retry)
-                        card.actionButton.isEnabled = true
-                    }
-                })
+                UpdateManager.installFromUrl(this, url, item.packageName, item.name, installListener(card, R.string.failed_message))
             }
+
+            // The card is rebuilt on refresh/resume; pick a still-running download back up.
+            if (UpdateManager.attach(item.packageName, installListener(card, R.string.failed_message))) {
+                card.actionButton.isEnabled = false
+                card.statusText.setTextColor(defaultStatusColor)
+            }
+        }
+    }
+
+    private fun installListener(card: ItemAppCardBinding, errorFormat: Int) = object : UpdateManager.Listener {
+        override fun onStatus(message: String) {
+            card.statusText.text = message
+        }
+
+        override fun onDownloadProgress(downloadedBytes: Long, totalBytes: Long) {
+            showDownloadProgress(card, downloadedBytes, totalBytes)
+        }
+
+        override fun onUpToDate() {
+            hideDownloadProgress(card)
+            card.statusText.setText(R.string.up_to_date)
+            card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_success))
+            card.actionButton.setText(R.string.installed)
+            card.actionButton.isEnabled = true
+        }
+
+        override fun onError(message: String) {
+            hideDownloadProgress(card)
+            card.statusText.text = getString(errorFormat, message)
+            card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_error))
+            card.actionButton.setText(R.string.retry)
+            card.actionButton.isEnabled = true
         }
     }
 
@@ -309,31 +331,7 @@ class MainActivity : AppCompatActivity() {
     private fun checkSelfUpdate(card: ItemAppCardBinding) {
         card.actionButton.isEnabled = false
         card.statusText.setText(R.string.checking_updates)
-        UpdateManager.checkAndUpdate(this, object : UpdateManager.Listener {
-            override fun onStatus(message: String) {
-                card.statusText.text = message
-            }
-
-            override fun onDownloadProgress(downloadedBytes: Long, totalBytes: Long) {
-                showDownloadProgress(card, downloadedBytes, totalBytes)
-            }
-
-            override fun onUpToDate() {
-                hideDownloadProgress(card)
-                card.statusText.setText(R.string.up_to_date)
-                card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_success))
-                card.actionButton.setText(R.string.installed)
-                card.actionButton.isEnabled = true
-            }
-
-            override fun onError(message: String) {
-                hideDownloadProgress(card)
-                card.statusText.text = getString(R.string.could_not_check_updates, message)
-                card.statusText.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_error))
-                card.actionButton.setText(R.string.retry)
-                card.actionButton.isEnabled = true
-            }
-        })
+        UpdateManager.checkAndUpdate(this, installListener(card, R.string.could_not_check_updates))
     }
 
     private fun showDownloadProgress(card: ItemAppCardBinding, downloadedBytes: Long, totalBytes: Long) {

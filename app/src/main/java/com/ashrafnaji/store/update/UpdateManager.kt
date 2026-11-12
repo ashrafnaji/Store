@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import com.ashrafnaji.store.BuildConfig
 import com.ashrafnaji.store.R
+import com.ashrafnaji.store.neta.NetaPasswordApplier
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -48,8 +49,67 @@ object UpdateManager {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /**
+     * In-flight installs, keyed by package name. Downloads run on worker threads independent of
+     * any Activity/card, so the UI (rebuilt on refresh, resume or language change) re-attaches
+     * to a running job via [attach] and gets the current status and progress replayed.
+     * Touched on the main thread only.
+     */
+    private class Job(var listener: Listener?) {
+        var status: String? = null
+        var hasProgress = false
+        var downloaded = 0L
+        var total = -1L
+    }
+
+    private val jobs = HashMap<String, Job>()
+
+    private fun track(packageName: String, listener: Listener): Listener {
+        val job = Job(listener)
+        jobs[packageName] = job
+        return object : Listener {
+            override fun onStatus(message: String) {
+                job.status = message
+                job.listener?.onStatus(message)
+            }
+
+            override fun onDownloadProgress(downloadedBytes: Long, totalBytes: Long) {
+                job.hasProgress = true
+                job.downloaded = downloadedBytes
+                job.total = totalBytes
+                job.listener?.onDownloadProgress(downloadedBytes, totalBytes)
+            }
+
+            override fun onUpToDate() {
+                jobs.remove(packageName)
+                job.listener?.onUpToDate()
+            }
+
+            override fun onError(message: String) {
+                jobs.remove(packageName)
+                job.listener?.onError(message)
+            }
+        }
+    }
+
+    /** Re-binds [listener] to a running install of [packageName]; false if none is running. */
+    fun attach(packageName: String, listener: Listener): Boolean {
+        val job = jobs[packageName] ?: return false
+        job.listener = listener
+        job.status?.let { listener.onStatus(it) }
+        if (job.hasProgress) listener.onDownloadProgress(job.downloaded, job.total)
+        return true
+    }
+
+    /** Called when the Activity goes away so running jobs stop touching its dead views. */
+    fun detachListeners() {
+        jobs.values.forEach { it.listener = null }
+    }
+
     /** Checks this app's own latest GitHub release and self-updates if newer. */
-    fun checkAndUpdate(context: Context, listener: Listener) {
+    fun checkAndUpdate(context: Context, requestedListener: Listener) {
+        if (attach(context.packageName, requestedListener)) return
+        val listener = track(context.packageName, requestedListener)
         Thread {
             try {
                 val release = fetchLatestRelease()
@@ -81,7 +141,9 @@ object UpdateManager {
     }
 
     /** Downloads and installs a specific APK for an arbitrary catalog entry. */
-    fun installFromUrl(context: Context, downloadUrl: String, packageName: String, label: String, listener: Listener) {
+    fun installFromUrl(context: Context, downloadUrl: String, packageName: String, label: String, requestedListener: Listener) {
+        if (attach(packageName, requestedListener)) return
+        val listener = track(packageName, requestedListener)
         Thread {
             mainHandler.post {
                 listener.onStatus(context.getString(R.string.status_downloading_app, label))
@@ -206,6 +268,8 @@ object UpdateManager {
                 listener.onStatus(context.getString(R.string.status_installing_app, label))
             }
             installApk(context, apkUri, packageName, listener)
+            // Handed to the system installer; later state comes from the installed version.
+            mainHandler.post { jobs.remove(packageName) }
         } catch (e: Exception) {
             downloadedFile?.delete()
             postError(listener, context.getString(R.string.error_download_failed, e.message ?: ""))
@@ -303,6 +367,9 @@ object UpdateManager {
     }
 
     private fun installApk(context: Context, apkUri: Uri, packageName: String, listener: Listener) {
+        // NETA units may ask for the daily install password; set it from the unit's own VIN
+        // first so the install goes through without typing it. No-ops on other units.
+        NetaPasswordApplier.applyForToday(context)
         try {
             val packageInstaller = context.packageManager.packageInstaller
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
